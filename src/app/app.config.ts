@@ -1,34 +1,23 @@
-import { ApplicationConfig, importProvidersFrom } from '@angular/core';
-import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import {
-  provideRouter,
-  withEnabledBlockingInitialNavigation,
-  withHashLocation,
-  withInMemoryScrolling,
-  withRouterConfig,
-  withViewTransitions
-} from '@angular/router';
-
-import { DropdownModule, SidebarModule } from '@coreui/angular';
-import { IconSetService } from '@coreui/icons-angular';
+import { ApplicationConfig } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
+import { authInterceptor } from './auth/auth.interceptor';
+
+import { IconSetService } from '@coreui/icons-angular';
+import { cilUser, cilPeople, cilTruck, cilSpeedometer } from '@coreui/icons';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideRouter(routes,
-      withRouterConfig({
-        onSameUrlNavigation: 'reload'
-      }),
-      withInMemoryScrolling({
-        scrollPositionRestoration: 'top',
-        anchorScrolling: 'enabled'
-      }),
-      withEnabledBlockingInitialNavigation(),
-      withViewTransitions(),
-      withHashLocation()
-    ),
-    importProvidersFrom(SidebarModule, DropdownModule),
-    IconSetService,
-    provideAnimationsAsync()
+    provideRouter(routes),
+    provideHttpClient(withInterceptors([authInterceptor])),
+    {
+      provide: IconSetService,
+      useFactory: () => {
+        const icons = new IconSetService();
+        icons.icons = { cilUser, cilPeople, cilTruck, cilSpeedometer };
+        return icons;
+      }
+    }
   ]
 };

@@ -1,0 +1,50 @@
+<div class="d-flex align-items-center min-vh-100 bg-light">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm rounded-3">
+          <div class="card-body p-4">
+            <h4 class="text-center mb-4">Login</h4>
+
+            <!-- Error message -->
+            <div *ngIf="error" class="alert alert-danger py-2">
+              {{ error }}
+            </div>
+
+            <!-- Username -->
+            <div class="mb-3">
+              <label for="username" class="form-label">Username</label>
+              <input type="text"
+                     id="username"
+                     [(ngModel)]="username"
+                     class="form-control"
+                     placeholder="Enter username"
+                     required />
+            </div>
+
+            <!-- Password -->
+            <div class="mb-3">
+              <label for="password" class="form-label">Password</label>
+              <input type="password"
+                     id="password"
+                     [(ngModel)]="password"
+                     class="form-control"
+                     placeholder="Enter password"
+                     required />
+            </div>
+
+            <!-- Submit -->
+            <div class="d-grid">
+              <button type="button"
+                      class="btn btn-primary"
+                      (click)="login()">
+                Login
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

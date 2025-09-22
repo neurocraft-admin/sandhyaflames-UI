@@ -1,44 +1,26 @@
-<!--sidebar-->
 <c-sidebar
-  #sidebar1="cSidebar"
-  class="d-print-none sidebar sidebar-fixed border-end"
-  colorScheme="dark"
-  id="sidebar1"
-  visible
+  class="sidebar sidebar-dark bg-dark"
+  *ngIf="sidebarItems && sidebarItems.length > 0"
 >
-  <c-sidebar-header class="border-bottom">
-    <c-sidebar-brand [routerLink]="[]">
-      <svg [class]="{icon: false}" cIcon class="sidebar-brand-full" height="32" name="logo" title="CoreUI Logo"></svg>
-      <svg cIcon class="sidebar-brand-narrow" height="32" name="signet" title="CoreUI Logo"></svg>
-    </c-sidebar-brand>
-  </c-sidebar-header>
-
-  <ng-scrollbar pointerEventsMethod="scrollbar" visibility="hover">
-    <c-sidebar-nav [navItems]="navItems" dropdownMode="close" compact />
-  </ng-scrollbar>
-
-  @if (!sidebar1.narrow) {
-    <c-sidebar-footer cSidebarToggle="sidebar1" class="border-top d-none d-lg-flex" toggle="unfoldable" style="cursor: pointer;">
-      <button cSidebarToggler aria-label="Toggle sidebar fold"></button>
-    </c-sidebar-footer>
-  }
+  <c-sidebar-nav [navItems]="sidebarItems"></c-sidebar-nav>
 </c-sidebar>
 
-<!--main-->
-<div class="wrapper d-flex flex-column min-vh-100">
-  <!--app-header-->
-  <app-default-header
-    [cShadowOnScroll]="'sm'"
-    class="mb-4 d-print-none header header-sticky p-0 shadow-sm"
-    position="sticky"
-    sidebarId="sidebar1"
-  />
-  <!--app-body-->
-  <div class="body flex-grow-1">
-    <c-container breakpoint="lg" class="h-auto px-4">
-      <router-outlet />
-    </c-container>
+<div class="wrapper d-flex flex-column min-vh-100 bg-light w-100">
+  <c-header class="header header-sticky mb-4">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">Gas Agency Management</h5>
+      <button cButton color="danger" (click)="logout()">Logout</button>
+    </div>
+  </c-header>
+
+  <div class="body flex-grow-1 px-3">
+    <router-outlet></router-outlet>
   </div>
-  <!--app footer-->
-  <app-default-footer />
+
+  <c-footer class="footer">
+    <div><strong>Gas Agency © 2025</strong></div>
+    <div class="ms-auto">
+      Powered by <a href="https://coreui.io" target="_blank">CoreUI</a>
+    </div>
+  </c-footer>
 </div>

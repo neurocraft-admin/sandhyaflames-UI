@@ -1,52 +1,57 @@
 import { Component } from '@angular/core';
-import { RouterLink, RouterOutlet } from '@angular/router';
-import { NgScrollbar } from 'ngx-scrollbar';
-
-import { IconDirective } from '@coreui/icons-angular';
+import { RouterOutlet } from '@angular/router';
 import {
-  ContainerComponent,
-  ShadowOnScrollDirective,
-  SidebarBrandComponent,
   SidebarComponent,
-  SidebarFooterComponent,
-  SidebarHeaderComponent,
   SidebarNavComponent,
-  SidebarToggleDirective,
-  SidebarTogglerDirective
+  HeaderComponent,
+  FooterComponent,
+  ButtonDirective,
+  SidebarNavHelper,   // ✅ required for c-sidebar-nav
+  INavData
 } from '@coreui/angular';
 
-import { DefaultFooterComponent, DefaultHeaderComponent } from './';
-import { navItems } from './_nav';
-
-function isOverflown(element: HTMLElement) {
-  return (
-    element.scrollHeight > element.clientHeight ||
-    element.scrollWidth > element.clientWidth
-  );
-}
-
 @Component({
-  selector: 'app-dashboard',
-  templateUrl: './default-layout.component.html',
-  styleUrls: ['./default-layout.component.scss'],
+  selector: 'app-default-layout',
+  standalone: true,
   imports: [
-    SidebarComponent,
-    SidebarHeaderComponent,
-    SidebarBrandComponent,
-    SidebarNavComponent,
-    SidebarFooterComponent,
-    SidebarToggleDirective,
-    SidebarTogglerDirective,
-    ContainerComponent,
-    DefaultFooterComponent,
-    DefaultHeaderComponent,
-    IconDirective,
-    NgScrollbar,
     RouterOutlet,
-    RouterLink,
-    ShadowOnScrollDirective
-  ]
+    SidebarComponent,
+    SidebarNavComponent,
+    HeaderComponent,
+    FooterComponent,
+    ButtonDirective
+  ],
+  providers: [SidebarNavHelper],   // ✅ fix NG0201
+  templateUrl: './default-layout.component.html',
+  styleUrls: ['./default-layout.component.scss']
 })
 export class DefaultLayoutComponent {
-  public navItems = [...navItems];
+  // ✅ Hard-coded menu for beta release
+  public sidebarItems: INavData[] = [
+    {
+      name: 'Dashboard',
+      url: '/dashboard',
+      iconComponent: { name: 'cil-speedometer' }
+    },
+    {
+      name: 'Users',
+      url: '/users',
+      iconComponent: { name: 'cil-user' }
+    },
+    {
+      name: 'Roles',
+      url: '/roles',
+      iconComponent: { name: 'cil-people' }
+    },
+    {
+      name: 'Delivery',
+      url: '/delivery',
+      iconComponent: { name: 'cil-truck' }
+    }
+  ];
+
+  logout() {
+    localStorage.clear();
+    window.location.href = '/login';
+  }
 }
