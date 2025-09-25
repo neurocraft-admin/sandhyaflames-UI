@@ -18,33 +18,15 @@ export const routes: Routes = [
     component: DefaultLayoutComponent,
     canActivate: [authGuard],
     children: [
-      {
-        path: 'dashboard',
-        loadChildren: () =>
-          import('./views/dashboard/routes').then(m => m.routes)
-      },
-      {
-        path: 'users',
-        canActivate: [permissionGuard],
-        data: { resource: 'Users', need: Perm.View },
-        loadChildren: () =>
-          import('./views/users/routes').then(m => m.routes)
-      },
-      {
-        path: 'roles',
-        canActivate: [permissionGuard],
-        data: { resource: 'Roles', need: Perm.View },
-        loadChildren: () =>
-          import('./views/roles/routes').then(m => m.routes)
-      },
-      {
-        path: 'delivery',
-        canActivate: [permissionGuard],
-        data: { resource: 'DailyDelivery', need: Perm.View },
-        loadChildren: () =>
-          import('./views/delivery/routes').then(m => m.routes)
-      }
-    ]
+  { path: 'dashboard', loadChildren: () => import('./views/dashboard/routes').then(m => m.routes) },
+  { path: 'users', loadChildren: () => import('./views/users/routes').then(m => m.routes) },
+  { path: 'roles', loadChildren: () => import('./views/roles/routes').then(m => m.routes) },
+  { path: 'delivery', loadChildren: () => import('./views/delivery/routes').then(m => m.routes) },
+  { path: 'products',loadChildren: () => import('./views/products/routes').then(m => m.routes)},
+  { path: 'drivers',loadChildren: () => import('./views/drivers/routes').then(m => m.routes),
+  { path: 'vehicles',loadChildren: () => import('./views/vehicles/routes').then(m => m.routes),
+}
+]
   },
 
   {

@@ -1,7 +1,5 @@
-<c-sidebar
-  class="sidebar sidebar-dark bg-dark"
-  *ngIf="sidebarItems && sidebarItems.length > 0"
->
+<c-sidebar class="sidebar sidebar-dark bg-dark" visible="true">
+  <!-- force visible sidebar -->
   <c-sidebar-nav [navItems]="sidebarItems"></c-sidebar-nav>
 </c-sidebar>
 
@@ -24,3 +22,27 @@
     </div>
   </c-footer>
 </div>
+<c-toaster position="top-end">
+  <c-toast
+    *ngFor="let toast of toastService.toasts"
+    [color]="toast.color || 'primary'"
+    [autohide]="toast.autohide ?? true"
+    [delay]="toast.delay ?? 3000"
+    [visible]="true"
+    (cClosed)="toastService.remove(toast)"
+  >
+    <c-toast-header *ngIf="toast.title">
+      {{ toast.title }}
+    </c-toast-header>
+    <c-toast-body>
+      {{ toast.body }}
+    </c-toast-body>
+  </c-toast>
+</c-toaster>
+
+
+
+
+
+
+
