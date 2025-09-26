@@ -30,7 +30,7 @@
       </td>
       <td>
         <button cButton size="sm" color="info" (click)="startEdit(v)">Edit</button>
-        <button cButton size="sm" color="danger" (click)="deactivate(v.vehicleId)">Deactivate</button>
+        <!-- <button cButton size="sm" color="danger" (click)="deactivate(v.vehicleId)">Deactivate</button> -->
       </td>
     </tr>
   </tbody>
@@ -56,6 +56,17 @@
         <label class="form-label">Purchase Date</label>
         <input type="date" class="form-control" formControlName="purchaseDate" />
       </div>
+      <div class="mb-3 form-check">
+  <input 
+    type="checkbox" 
+    class="form-check-input" 
+    id="isActive" 
+    formControlName="isActive">
+  <label class="form-check-label" for="isActive">
+    Active
+  </label>
+</div>
+
     </div>
     <div>
       <button cButton color="success" type="submit" [disabled]="form.invalid || loading()">Save</button>
