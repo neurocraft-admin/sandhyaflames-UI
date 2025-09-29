@@ -76,7 +76,18 @@ export class DefaultLayoutComponent {
       name: 'Vehicles',
       url: '/vehicles',
       iconComponent: { name: 'cil-truck' }
+    },
+    {
+      name: 'vehicle-assignment',
+      url: '/vehicle-assignment',
+      iconComponent: { name: 'cil-truck' }
+    },
+    {
+      name: 'PurchaseEntry',
+      url: '/PurchaseEntry',
+      iconComponent: { name: 'cil-truck' }
     }
+
   ];
 
   logout() {
