@@ -14,9 +14,9 @@
               <th>Date</th>
               <th>Vendor</th>
               <th>Invoice #</th>
-              <th>Total</th>
+              <th class="text-end">Total</th>
               <th>Status</th>
-              <th style="width:140px">Action</th>
+              <th style="width:160px">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -24,13 +24,13 @@
               <td>{{ r.purchaseDate | date:'shortDate' }}</td>
               <td>{{ r.vendorName }}</td>
               <td>{{ r.invoiceNo }}</td>
-              <td>₹ {{ r.totalAmount | number:'1.2-2' }}</td>
+              <td class="text-end">₹ {{ r.totalAmount | number:'1.2-2' }}</td>
               <td>
                 <span class="badge" [class.bg-success]="r.isActive" [class.bg-secondary]="!r.isActive">
                   {{ r.isActive ? 'Active' : 'Inactive' }}
                 </span>
               </td>
-              <td>
+              <td class="d-flex gap-2">
                 <button cButton size="sm" (click)="startEdit(r)">Edit</button>
                 <button cButton size="sm" color="warning" (click)="toggleActive(r)">Toggle</button>
               </td>
@@ -50,8 +50,8 @@
           <div class="col-md-4">
             <label class="form-label">Vendor *</label>
             <select class="form-select" formControlName="vendorId">
-              <option value="">-- Select Vendor --</option>
-              <option *ngFor="let v of vendors" [value]="v.vendorId">{{ v.vendorName }}</option>
+              <option [ngValue]="0">-- Select Vendor --</option>
+              <option *ngFor="let v of vendors" [ngValue]="v.vendorId">{{ v.vendorName }}</option>
             </select>
           </div>
           <div class="col-md-4">
@@ -72,23 +72,33 @@
           <table class="table table-sm align-middle">
             <thead>
               <tr>
-                <th style="width:40%">Product *</th>
-                <th style="width:15%">Qty *</th>
-                <th style="width:20%">Unit Price *</th>
-                <th style="width:15%" class="text-end">Line Total</th>
-                <th style="width:10%"></th>
+                <th style="width:32%">Product *</th>
+                <th style="width:15%">Category</th>
+                <th style="width:18%">Subcategory</th>
+                <th style="width:10%">Qty *</th>
+                <th style="width:15%">Unit Price *</th>
+                <th style="width:10%" class="text-end">Line Total</th>
+                <th style="width:5%"></th>
               </tr>
             </thead>
             <tbody formArrayName="items">
               <tr *ngFor="let it of items.controls; let i = index" [formGroupName]="i">
                 <td>
                   <select class="form-select" formControlName="productId" (change)="onProductChange(i)">
-                    <option value="">-- Select Product --</option>
-                    <option *ngFor="let p of products" [value]="p.productId">
+                    <option [ngValue]="0">-- Select Product --</option>
+                    <option *ngFor="let p of products" [ngValue]="p.productId">
                       {{ p.productName }}
-                      <ng-container *ngIf="p.categoryName"> ({{ p.categoryName }}) </ng-container>
                     </option>
                   </select>
+                  <!-- hidden category/subcategory IDs bound for POST -->
+                  <input type="hidden" formControlName="categoryId" />
+                  <input type="hidden" formControlName="subCategoryId" />
+                </td>
+                <td>
+                  <span class="text-muted">{{ getCategoryNameForRow(i) }}</span>
+                </td>
+                <td>
+                  <span class="text-muted">{{ getSubCategoryNameForRow(i) }}</span>
                 </td>
                 <td><input type="number" class="form-control" formControlName="qty" min="1" /></td>
                 <td><input type="number" class="form-control" formControlName="unitPrice" min="0" step="0.01" /></td>
