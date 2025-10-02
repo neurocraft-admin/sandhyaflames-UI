@@ -1,0 +1,71 @@
+<div class="container-fluid">
+  <div class="mb-3 d-flex justify-content-between">
+    <h4>Daily Delivery</h4>
+    <button cButton color="primary" (click)="submit()">Save</button>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form [formGroup]="form">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Date *</label>
+            <input type="date" formControlName="deliveryDate" class="form-control"/>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Vehicle *</label>
+            <input type="number" formControlName="vehicleId" class="form-control"/>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Start Time *</label>
+            <input type="time" formControlName="startTime" class="form-control"/>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Return Time</label>
+            <input type="time" formControlName="returnTime" class="form-control"/>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Remarks</label>
+            <input formControlName="remarks" class="form-control"/>
+          </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="table-responsive mt-4" formArrayName="items">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width:32%">Product *</th>
+                <th style="width:18%">Category</th>
+                <th style="width:18%">Subcategory</th>
+                <th style="width:10%">Invoices</th>
+                <th style="width:10%">Items</th>
+                <th style="width:12%"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let it of items.controls; let i = index" [formGroupName]="i">
+                <td>
+                  <select class="form-select" formControlName="productId" (change)="onProductChange(i)">
+                    <option [ngValue]="0">-- Select Product --</option>
+                    <option *ngFor="let p of products" [ngValue]="p.productId">{{ p.productName }}</option>
+                  </select>
+                  <input type="hidden" formControlName="categoryId" />
+                  <input type="hidden" formControlName="subCategoryId" />
+                </td>
+                <td>{{ getCategoryName(it.value.productId) }}</td>
+                <td>{{ getSubCategoryName(it.value.productId) }}</td>
+                <td><input type="number" class="form-control" formControlName="noOfInvoices" min="0"/></td>
+                <td><input type="number" class="form-control" formControlName="noOfItems" min="0"/></td>
+                <td>
+                  <button cButton color="danger" size="sm" type="button" (click)="items.removeAt(i)" *ngIf="items.length>1">✕</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <button cButton color="secondary" type="button" (click)="addItemRow()">+ Add Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

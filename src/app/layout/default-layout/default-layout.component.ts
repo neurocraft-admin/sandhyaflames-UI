@@ -86,6 +86,17 @@ export class DefaultLayoutComponent {
       name: 'PurchaseEntry',
       url: '/PurchaseEntry',
       iconComponent: { name: 'cil-truck' }
+    },
+    {
+      name: 'ProductPricing',
+      url: '/ProductPricing',
+      iconComponent: { name: 'cil-truck' }
+    },
+    
+    {
+      name: 'Daily-Delivery',
+      url: '/DailyDelivery',
+      iconComponent: { name: 'cil-truck' }
     }
 
   ];

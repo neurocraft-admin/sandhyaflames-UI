@@ -27,6 +27,8 @@ export const routes: Routes = [
   { path: 'vehicles',loadChildren: () => import('./views/vehicles/routes').then(m => m.routes)},
   { path: 'vehicle-assignment',loadChildren: () => import('./views/vehicle-assignments/routes').then(m => m.routes)},
   { path: 'PurchaseEntry',loadChildren: () => import('./views/purchase-entry/routes').then(m => m.routes)},
+  { path: 'ProductPricing',loadChildren: () => import('./views/product-pricing/routes').then(m => m.routes)},
+  { path: 'DailyDelivery',loadChildren: () => import('./views/daily-delivery/routes').then(m => m.routes)},
 
 ]
   },
