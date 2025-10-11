@@ -1,0 +1,45 @@
+<div class="card mt-3 shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">Update Daily Delivery Actuals</h5>
+
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label>Return Time</label>
+          <input type="time" class="form-control" formControlName="returnTime">
+        </div>
+
+        <div class="col-md-4">
+          <label>Completed Invoices</label>
+          <input type="number" class="form-control" formControlName="completedInvoices">
+        </div>
+
+        <div class="col-md-4">
+          <label>Pending Invoices</label>
+          <input type="number" class="form-control" formControlName="pendingInvoices">
+        </div>
+      </div>
+
+      <div class="row g-3 mt-2">
+        <div class="col-md-4">
+          <label>Cash Collected</label>
+          <input type="number" class="form-control" formControlName="cashCollected">
+        </div>
+
+        <div class="col-md-4">
+          <label>Empty Cylinders Returned</label>
+          <input type="number" class="form-control" formControlName="emptyCylindersReturned">
+        </div>
+
+        <div class="col-md-4">
+          <label>Remarks</label>
+          <input type="text" class="form-control" formControlName="remarks">
+        </div>
+      </div>
+
+      <div class="mt-4 text-end">
+        <button type="submit" class="btn btn-primary">Save Actuals</button>
+      </div>
+    </form>
+  </div>
+</div>

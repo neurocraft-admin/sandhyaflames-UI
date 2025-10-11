@@ -45,4 +45,37 @@ export class DriverService {
   softDeleteDriver(id: number): Observable<any> {
     return this.http.put(`${DRIVERS_URL}/${id}`, { isActive: false });
   }
+  getVehicleByDriver(driverId: number): Observable<{ vehicleId: number, vehicleNo: string }> {
+    return this.http.get<{ vehicleId: number, vehicleNo: string }>(`${environment.apiUrl}/drivers/${driverId}/vehicle`);
+  }
+ // driver.service.ts
+// getDeliveryDrivers(): Observable<{ driverId: number, name: string }[]> {
+//   return this.http.get<any[]>(DRIVERS_URL).pipe(
+//     map(rows => (rows || []).map(d => ({
+//       driverId: d.driverId,
+//       name: d.fullName      // ✅ ensure we map to "name"
+//     })))
+//   );
+// }
+getDeliveryDrivers(): Observable<{ driverId: number; driverName: string }[]> {
+  return this.http.get<any[]>(`${environment.apiUrl}/drivers/delivery`).pipe(
+    map((rows: any[]) =>
+      (rows || []).map(d => ({
+        driverId: d.DriverId ?? d.driverId,
+        driverName: d.FullName ?? d.DriverName ?? d.driverName
+      }))
+    )
+  );
+}
+
+
+
+
+
+
+
+//   getAll(): Observable<any[]> {
+//   return this.http.get<any[]>(`${environment.apiUrl}/drivers`);
+// }
+
 }

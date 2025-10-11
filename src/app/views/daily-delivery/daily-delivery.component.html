@@ -1,71 +1,154 @@
-<div class="container-fluid">
-  <div class="mb-3 d-flex justify-content-between">
-    <h4>Daily Delivery</h4>
-    <button cButton color="primary" (click)="submit()">Save</button>
-  </div>
-
-  <div class="card">
+<!-- src/app/views/daily-delivery/daily-delivery.component.html -->
+<div class="container mt-3">
+  <div class="card shadow-sm">
     <div class="card-body">
-      <form [formGroup]="form">
-        <div class="row g-3">
+      <h5 class="card-title mb-3">Daily Delivery Entry</h5>
+
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <!-- ===== Header Fields ===== -->
+        <div class="row mb-3">
+          <!-- Date -->
           <div class="col-md-3">
-            <label class="form-label">Date *</label>
-            <input type="date" formControlName="deliveryDate" class="form-control"/>
+            <label for="deliveryDate" class="form-label">Date</label>
+            <input id="deliveryDate" type="date" class="form-control" formControlName="deliveryDate" />
           </div>
+
+          <!-- Driver -->
+          <div class="col-md-4">
+            <label for="driverSelect" class="form-label">Driver</label>
+            <select id="driverSelect" class="form-select" formControlName="driverId" (change)="onDriverChange()">
+              <option [ngValue]="0">-- Select Driver --</option>
+              <option *ngFor="let d of drivers" [ngValue]="d.driverId">
+                {{ d.driverName }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Vehicle -->
           <div class="col-md-3">
-            <label class="form-label">Vehicle *</label>
-            <input type="number" formControlName="vehicleId" class="form-control"/>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Start Time *</label>
-            <input type="time" formControlName="startTime" class="form-control"/>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Return Time</label>
-            <input type="time" formControlName="returnTime" class="form-control"/>
-          </div>
-          <div class="col-12">
-            <label class="form-label">Remarks</label>
-            <input formControlName="remarks" class="form-control"/>
+            <label for="vehicleBox" class="form-label">Vehicle</label>
+            <input id="vehicleBox" type="text" class="form-control" [value]="selectedVehicleNo" readonly />
           </div>
         </div>
 
-        <!-- Items Table -->
-        <div class="table-responsive mt-4" formArrayName="items">
-          <table class="table table-sm align-middle">
-            <thead>
-              <tr>
-                <th style="width:32%">Product *</th>
-                <th style="width:18%">Category</th>
-                <th style="width:18%">Subcategory</th>
-                <th style="width:10%">Invoices</th>
-                <th style="width:10%">Items</th>
-                <th style="width:12%"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let it of items.controls; let i = index" [formGroupName]="i">
-                <td>
-                  <select class="form-select" formControlName="productId" (change)="onProductChange(i)">
-                    <option [ngValue]="0">-- Select Product --</option>
-                    <option *ngFor="let p of products" [ngValue]="p.productId">{{ p.productName }}</option>
-                  </select>
-                  <input type="hidden" formControlName="categoryId" />
-                  <input type="hidden" formControlName="subCategoryId" />
-                </td>
-                <td>{{ getCategoryName(it.value.productId) }}</td>
-                <td>{{ getSubCategoryName(it.value.productId) }}</td>
-                <td><input type="number" class="form-control" formControlName="noOfInvoices" min="0"/></td>
-                <td><input type="number" class="form-control" formControlName="noOfItems" min="0"/></td>
-                <td>
-                  <button cButton color="danger" size="sm" type="button" (click)="items.removeAt(i)" *ngIf="items.length>1">✕</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <button cButton color="secondary" type="button" (click)="addItemRow()">+ Add Item</button>
+        <!-- ===== Time & Remarks ===== -->
+        <div class="row mb-3">
+          <!-- Start Time -->
+          <div class="col-md-3">
+            <label for="startTime" class="form-label">Start Time</label>
+            <input id="startTime" type="time" class="form-control" formControlName="startTime" />
+          </div>
+
+          <!-- Return Time -->
+          <div class="col-md-3">
+            <label for="returnTime" class="form-label">Return Time</label>
+            <input id="returnTime" type="time" class="form-control" formControlName="returnTime" />
+          </div>
+
+          <!-- Remarks -->
+          <div class="col-md-6">
+            <label for="remarks" class="form-label">Remarks</label>
+            <input id="remarks" type="text" class="form-control" formControlName="remarks"
+              placeholder="Optional remarks..." />
+          </div>
+        </div>
+
+        <!-- ===== Product Items ===== -->
+        <div formArrayName="items">
+          <h6 class="mt-3">Products</h6>
+          <div *ngFor="let item of items.controls; let i = index" [formGroupName]="i" class="row mb-2 align-items-end">
+            <!-- Product -->
+            <div class="col-md-4">
+              <label class="form-label">Product</label>
+              <select class="form-select" formControlName="productId" (change)="onProductSelect(item, $event)">
+                <option value="0">-- Select Product --</option>
+                <option *ngFor="let p of products" [value]="p.productId">
+                  {{ p.productName }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Cylinders -->
+            <div class="col-md-2">
+              <label class="form-label">Cylinders</label>
+              <input type="number" class="form-control" formControlName="noOfCylinders" />
+            </div>
+
+            <!-- Invoices -->
+            <div class="col-md-2">
+              <label class="form-label">Invoices</label>
+              <input type="number" class="form-control" formControlName="noOfInvoices" />
+            </div>
+
+            <!-- Deliveries -->
+            <div class="col-md-2">
+              <label class="form-label">Deliveries</label>
+              <input type="number" class="form-control" formControlName="noOfDeliveries" />
+            </div>
+
+            <!-- Items -->
+            <div class="col-md-2">
+              <label class="form-label">Items</label>
+              <input type="number" class="form-control" formControlName="noOfItems" />
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-sm btn-secondary mt-2" (click)="addItemRow()">
+            + Add Item
+          </button>
+        </div>
+
+        <!-- ===== Save Button ===== -->
+        <div class="mt-4 text-end">
+          <button type="submit" class="btn btn-primary">
+            Save Delivery
+          </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ===== Existing Deliveries Table ===== -->
+  <div class="card mt-4 shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title mb-3">Existing Deliveries</h5>
+      <table class="table table-bordered table-striped table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Driver</th>
+            <th>Status</th>
+            <th>Completed</th>
+            <th>Pending</th>
+            <th>Cash</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let d of deliveries">
+            <td>{{ d.DeliveryDate | date: 'dd-MM-yyyy' }}</td>
+            <td>{{ d.DriverName || '-' }}</td>
+            <td>{{ d.Status }}</td>
+            <td>{{ d.CompletedInvoices }}</td>
+            <td>{{ d.PendingInvoices }}</td>
+            <td>{{ d.CashCollected | currency: 'INR' }}</td>
+            <td>
+              <button class="btn btn-info btn-sm me-1" (click)="recompute(d.DeliveryId)">
+                Recompute
+              </button>
+              <button class="btn btn-success btn-sm" (click)="closeDelivery(d.DeliveryId)"
+                [disabled]="d.status === 'Closed'">
+                Close
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="!deliveries || deliveries.length === 0">
+            <td colspan="7" class="text-center text-muted">
+              No deliveries found.
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>

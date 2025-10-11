@@ -29,6 +29,7 @@ export const routes: Routes = [
   { path: 'PurchaseEntry',loadChildren: () => import('./views/purchase-entry/routes').then(m => m.routes)},
   { path: 'ProductPricing',loadChildren: () => import('./views/product-pricing/routes').then(m => m.routes)},
   { path: 'DailyDelivery',loadChildren: () => import('./views/daily-delivery/routes').then(m => m.routes)},
+  { path: 'DailyDeliveryUpdate',loadChildren: () => import('./views/daily-delivery-update/routes').then(m => m.routes)},
 
 ]
   },
