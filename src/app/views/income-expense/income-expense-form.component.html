@@ -1,0 +1,67 @@
+<div class="card mt-4">
+  <div class="card-body">
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="row mb-3">
+        <div class="col-md-3">
+          <label>Date</label>
+          <input type="date" class="form-control" formControlName="entryDate" />
+        </div>
+        <div class="col-md-3">
+          <label>Type</label>
+          <select class="form-select" formControlName="type">
+            <option value="Income">Income</option>
+            <option value="Expense">Expense</option>
+          </select>
+        </div>
+        <div class="col-md-6 position-relative">
+  <label>Category</label>
+  <input
+    type="text"
+    class="form-control"
+    formControlName="categoryName"
+    (input)="onSearchCategory($event.target.value)"
+    autocomplete="off"
+    placeholder="Enter or select category..."
+  />
+
+  <ul
+    *ngIf="suggestions.length > 0"
+    class="list-group position-absolute w-100 shadow-sm"
+    style="z-index: 1050; max-height: 200px; overflow-y: auto;"
+  >
+    <li
+      *ngFor="let s of suggestions"
+      (click)="selectCategory(s)"
+      class="list-group-item list-group-item-action"
+      style="cursor: pointer;"
+    >
+      {{ s }}
+    </li>
+  </ul>
+</div>
+
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-3">
+          <label>Amount</label>
+          <input type="number" class="form-control" formControlName="amount" />
+        </div>
+        <div class="col-md-3">
+          <label>Payment Mode</label>
+          <select class="form-select" formControlName="paymentMode">
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label>Remarks</label>
+          <input type="text" class="form-control" formControlName="remarks" />
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Save Entry</button>
+    </form>
+  </div>
+</div>

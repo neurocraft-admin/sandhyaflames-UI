@@ -58,11 +58,6 @@ export class DefaultLayoutComponent {
       iconComponent: { name: 'cil-people' }
     },
     {
-      name: 'Delivery',
-      url: '/delivery',
-      iconComponent: { name: 'cil-truck' }
-    },
-    {
       name: 'Products',
       url: '/products',
       iconComponent: { name: 'cil-truck' }
@@ -96,6 +91,12 @@ export class DefaultLayoutComponent {
     {
       name: 'Daily-Delivery',
       url: '/DailyDelivery',
+      iconComponent: { name: 'cil-truck' }
+    },
+    
+    {
+      name: 'Income-Expense',
+      url: '/IncomeExpenseForm',
       iconComponent: { name: 'cil-truck' }
     }
 

@@ -30,6 +30,7 @@ export const routes: Routes = [
   { path: 'ProductPricing',loadChildren: () => import('./views/product-pricing/routes').then(m => m.routes)},
   { path: 'DailyDelivery',loadChildren: () => import('./views/daily-delivery/routes').then(m => m.routes)},
   { path: 'DailyDeliveryUpdate',loadChildren: () => import('./views/daily-delivery-update/routes').then(m => m.routes)},
+  { path: 'IncomeExpenseForm',loadChildren: () => import('./views/income-expense/routes').then(m => m.routes)},
 
 ]
   },
