@@ -22,27 +22,11 @@
     </div>
   </c-footer>
 </div>
-<c-toaster position="top-end">
-  <c-toast
-    *ngFor="let toast of toastService.toasts"
-    [color]="toast.color || 'primary'"
-    [autohide]="toast.autohide ?? true"
-    [delay]="toast.delay ?? 3000"
-    [visible]="true"
-    (cClosed)="toastService.remove(toast)"
-  >
-    <c-toast-header *ngIf="toast.title">
-      {{ toast.title }}
-    </c-toast-header>
-    <c-toast-body>
-      {{ toast.body }}
-    </c-toast-body>
+<c-toaster position="top-center" class="top-center-fix">
+  <c-toast *ngFor="let toast of toastService.toasts" [color]="toast.color || 'primary'"
+    [autohide]="toast.autohide ?? true" [delay]="toast.delay ?? 3000" [visible]="true"
+    (cClosed)="toastService.remove(toast)">
+    <c-toast-header *ngIf="toast.title">{{ toast.title }}</c-toast-header>
+    <c-toast-body>{{ toast.body }}</c-toast-body>
   </c-toast>
 </c-toaster>
-
-
-
-
-
-
-

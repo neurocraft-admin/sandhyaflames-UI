@@ -1,49 +1,68 @@
 import { Component, OnInit,inject } from '@angular/core';
 import { DailyDeliveryService } from '../../services/daily-delivery.service';
 import { ToastService } from '../../services/toast.service';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ReactiveFormsModule, FormArray, FormBuilder, Validators, FormGroup, AbstractControl } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { HttpClientModule } from '@angular/common/http';
+
 
 @Component({
   selector: 'app-daily-delivery-update',
+  templateUrl: './daily-delivery-update.component.html',
   standalone: true,
-  imports: [ ReactiveFormsModule],
-  templateUrl: './daily-delivery-update.component.html'
+  imports: [CommonModule, ReactiveFormsModule, HttpClientModule,RouterModule ]
 })
 export class DailyDeliveryUpdateComponent implements OnInit {
-
-  private fb = inject(FormBuilder);
-  form = this.fb.group({
-    deliveryId: [0],
-    returnTime: [''],
-    completedInvoices: [0, [Validators.required, Validators.min(0)]],
-    pendingInvoices: [0, [Validators.required, Validators.min(0)]],
-    cashCollected: [0, [Validators.required, Validators.min(0)]],
-    emptyCylindersReturned: [0, [Validators.required, Validators.min(0)]],
-    remarks: ['']
-  });
+  form!: FormGroup;
+  deliveryId!: number;
+  header: any = {};
+  driver:any={};
 
   constructor(
-    private fbs: FormBuilder,
-    private svc: DailyDeliveryService,
-    private toast: ToastService,
+    private fb: FormBuilder,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private deliveryService: DailyDeliveryService
   ) {}
 
   ngOnInit(): void {
-    const id = Number(this.route.snapshot.paramMap.get('id'));
-    this.form.patchValue({ deliveryId: id });
+    this.deliveryId = +this.route.snapshot.params['id'];
+    this.form = this.fb.group({
+      returnTime: [''],
+      completedInvoices: [0, Validators.required],
+      pendingInvoices: [0, Validators.required],
+      cashCollected: [0, Validators.required],
+      emptyCylindersReturned: [0, Validators.required],
+      remarks: ['']
+    });
+
+    this.deliveryService.getDeliveryById(this.deliveryId).subscribe(res => {
+      this.header = res.header;
+      this.driver = res.driver?.[0] ?? {};
+      const m = res.metrics;
+      this.form.patchValue({
+        returnTime: m.returnTime,
+        completedInvoices: m.completedInvoices,
+        pendingInvoices: m.pendingInvoices,
+        cashCollected: m.cashCollected,
+        emptyCylindersReturned: m.emptyCylindersReturned,
+        remarks: m.remarks
+      });
+    });
   }
 
-  save() {
-    const id = this.form.value.deliveryId!;
-    this.svc.updateActuals(id, this.form.value).subscribe({
-      next: () => {
-        this.toast.success('Delivery actuals updated successfully');
-        this.router.navigate(['/daily-delivery']);
-      },
-      error: () => this.toast.error('Failed to update actuals')
+  save(): void {
+    this.deliveryService.updateActuals(this.deliveryId, this.form.value).subscribe(() => {
+      alert('Updated successfully!');
+      this.router.navigate(['/daily-delivery']);
+    });
+  }
+
+  closeDelivery(): void {
+    this.deliveryService.closeDelivery(this.deliveryId).subscribe(() => {
+      alert('Delivery closed.');
+      this.router.navigate(['/daily-delivery']);
     });
   }
 }

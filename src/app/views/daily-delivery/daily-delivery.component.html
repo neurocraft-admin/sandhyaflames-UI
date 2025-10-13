@@ -140,6 +140,9 @@
                 [disabled]="d.status === 'Closed'">
                 Close
               </button>
+              <button class="btn btn-warning btn-sm me-1" [routerLink]="['/DailyDeliveryUpdate', d.DeliveryId]">
+                Update
+              </button>
             </td>
           </tr>
           <tr *ngIf="!deliveries || deliveries.length === 0">

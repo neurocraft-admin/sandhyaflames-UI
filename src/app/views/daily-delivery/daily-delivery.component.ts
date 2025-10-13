@@ -7,11 +7,12 @@ import { ProductDropdownService, ProductOption } from '../../services/product-dr
 import { DriverService } from '../../services/driver.service';
 import { ToastService } from '../../services/toast.service';
 import { DeliveryCloseRequest } from '../../models/daily-delivery.model';
+import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-daily-delivery',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule,RouterModule],
   templateUrl: './daily-delivery.component.html'
 })
 
@@ -44,8 +45,6 @@ export class DailyDeliveryComponent {
   ngOnInit() {
   console.log('✅ DailyDeliveryComponent initialized');
     this.productSvc.getAll().subscribe(p => this.products = p || []);
-   // this.driverSvc.getDeliveryDrivers().subscribe(d => this.drivers = d);
-    debugger; // will stop execution in browser dev tools
   console.log('✅ ngOnInit fired');
   this.driverSvc.getDeliveryDrivers().subscribe({
     next: d => {
@@ -193,7 +192,39 @@ onProductChange(itemGroup: FormGroup, product?: any) {
         this.addItemRow();
         this.loadDeliveries();
       },
-      error: () => this.toast.error('Create failed')
+    error: (err) => {
+  let message = 'Something went wrong while creating delivery.';
+
+  const raw = err?.error;
+
+  let technicalMessage = '';
+
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      technicalMessage = parsed?.message || raw;
+    } catch {
+      technicalMessage = raw;
+    }
+  } else if (raw?.message) {
+    technicalMessage = raw.message;
+  } else if (raw?.title) {
+    technicalMessage = raw.title;
+  }
+
+  // ✅ Apply friendly error mapping
+  if (technicalMessage.includes('UX_DailyDelivery_Vehicle_Date_Open')) {
+    message = 'A delivery already exists for this vehicle and date.';
+  } else if (technicalMessage.includes('no active price')) {
+    message = 'Some items have no active price for the selected date.';
+  } else {
+    message = technicalMessage; // fallback to raw if no mapping
+  }
+
+  this.toast.error(message);
+}
+
+
     });
     console.log('Form value:', this.form.value);
     console.log('Form valid:', this.form.valid);

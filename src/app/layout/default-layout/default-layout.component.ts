@@ -97,12 +97,6 @@ export class DefaultLayoutComponent {
       name: 'Daily-Delivery',
       url: '/DailyDelivery',
       iconComponent: { name: 'cil-truck' }
-    },
-    
-    {
-      name: 'Delivery-Update',
-      url: '/DailyDeliveryUpdate',
-      iconComponent: { name: 'cil-truck' }
     }
 
   ];

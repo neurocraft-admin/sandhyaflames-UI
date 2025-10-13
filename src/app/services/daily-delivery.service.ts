@@ -43,4 +43,13 @@ updateActuals(id: number, data: any): Observable<any> {
   return this.http.put(`${environment.apiUrl}/dailydelivery/${id}/actuals`, data);
 }
 
+closeDelivery(id: number) {
+  return this.http.put(`/api/dailydelivery/${id}/close`, {});
+}
+
+getDeliveryById(id: number) {
+  return this.http.get<any>(`/api/dailydelivery/${id}`);
+}
+
+
 }
