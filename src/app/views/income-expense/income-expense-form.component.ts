@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, Validators } from '@angular/forms';
 import { IncomeExpenseService } from '../../services/income-expense.service';
 import { ToastService } from '../../services/toast.service';
 import { CommonModule } from '@angular/common';
@@ -10,7 +10,7 @@ import { HttpClientModule } from '@angular/common/http';
   selector: 'app-income-expense-form',
   standalone: true,
   templateUrl: './income-expense-form.component.html',
-  imports: [CommonModule, ReactiveFormsModule,  HttpClientModule]
+  imports: [CommonModule, ReactiveFormsModule,  HttpClientModule,FormsModule]
 })
 export class IncomeExpenseFormComponent implements OnInit {
   form!: FormGroup;
@@ -34,6 +34,30 @@ export class IncomeExpenseFormComponent implements OnInit {
 
     this.watchTypeChanges();
   }
+  incomeExpenseList: any[] = [];
+filterType = '';
+filterFrom = '';
+filterTo = '';
+
+fetchList() {
+  this.svc.fetchList(this.filterType, this.filterFrom, this.filterTo)
+    .subscribe({
+      next: (res) => this.incomeExpenseList = res,
+      error: (err) => this.toast.error(err?.error?.title || 'Failed to load')
+    });
+}
+
+deleteEntry(id: number) {
+  if (!confirm('Delete this entry?')) return;
+  this.svc.delete(id).subscribe({
+    next: () => {
+      this.toast.success('Deleted successfully');
+      this.fetchList();
+    },
+    error: (err) => this.toast.error(err?.error?.title || 'Delete failed')
+  });
+}
+
 
   private today(): string {
     return new Date().toISOString().substring(0, 10);

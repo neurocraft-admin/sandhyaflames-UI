@@ -15,4 +15,17 @@ export class IncomeExpenseService {
   getCategories(type: string, search: string = '') {
     return this.http.get<any[]>(`${BASE_URL}/categories?type=${type}&search=${search}`);
   }
+  fetchList(type?: string, from?: string, to?: string) {
+  const params: any = {};
+  if (type) params.type = type;
+  if (from) params.from = from;
+  if (to) params.to = to;
+
+  return this.http.get<any[]>(`${BASE_URL}/list`, { params });
+}
+
+delete(id: number) {
+  return this.http.delete(`${BASE_URL}/${id}`);
+}
+
 }

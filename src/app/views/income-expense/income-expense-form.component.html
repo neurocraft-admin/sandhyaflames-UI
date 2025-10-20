@@ -65,3 +65,53 @@
     </form>
   </div>
 </div>
+<!-- 📋 Income/Expense List Below Form -->
+<div class="card mt-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div>
+      <strong>Recent Income / Expense Entries</strong>
+    </div>
+    <div class="d-flex gap-2">
+      <select class="form-select form-select-sm" [(ngModel)]="filterType" (change)="fetchList()">
+        <option value="">All Types</option>
+        <option value="Income">Income</option>
+        <option value="Expense">Expense</option>
+      </select>
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filterFrom" (change)="fetchList()">
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filterTo" (change)="fetchList()">
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-bordered mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Category</th>
+          <th>Amount</th>
+          <th>Payment Mode</th>
+          <th>Remarks</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of incomeExpenseList">
+          <td>{{ row.EntryDate | date:'mediumDate' }}</td>
+          <td>{{ row.Type }}</td>
+          <td>{{ row.CategoryName }}</td>
+          <td>{{ row.Amount | number:'1.2-2' }}</td>
+          <td>{{ row.PaymentMode }}</td>
+          <td>{{ row.Remarks }}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" (click)="deleteEntry(row.EntryId)">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="incomeExpenseList.length === 0">
+          <td colspan="7" class="text-center">No entries found</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
