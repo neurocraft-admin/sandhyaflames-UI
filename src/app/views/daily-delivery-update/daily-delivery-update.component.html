@@ -1,0 +1,56 @@
+<div class="card">
+  <div class="card-header"><strong>Update Delivery</strong></div>
+  <div class="card-body">
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label>Driver</label>
+          <input class="form-control" [value]="driver.DriverName" disabled />
+        </div>
+        <div class="col-md-4">
+          <label>Vehicle</label>
+          <input class="form-control" [value]="header.VehicleNumber" disabled />
+        </div>
+        <div class="col-md-4">
+          <label>Date</label>
+          <input class="form-control" [value]="header.DeliveryDate | date:'shortDate'" disabled />
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label>Return Time</label>
+          <input class="form-control" formControlName="returnTime" type="time" />
+        </div>
+        <div class="col-md-4">
+          <label>Completed Invoices</label>
+          <input class="form-control" formControlName="completedInvoices" type="number" />
+        </div>
+        <div class="col-md-4">
+          <label>Pending Invoices</label>
+          <input class="form-control" formControlName="pendingInvoices" type="number" />
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label>Cash Collected</label>
+          <input class="form-control" formControlName="cashCollected" type="number" />
+        </div>
+        <div class="col-md-4">
+          <label>Empty Cylinders Returned</label>
+          <input class="form-control" formControlName="emptyCylindersReturned" type="number" />
+        </div>
+        <div class="col-md-4">
+          <label>Remarks</label>
+          <input class="form-control" formControlName="remarks" />
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-success" type="submit">Save Update</button>
+        <button class="btn btn-danger" type="button" (click)="closeDelivery()">Close Delivery</button>
+      </div>
+    </form>
+  </div>
+</div>

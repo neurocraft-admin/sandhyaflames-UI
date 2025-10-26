@@ -1,0 +1,117 @@
+<div class="card mt-4">
+  <div class="card-body">
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="row mb-3">
+        <div class="col-md-3">
+          <label>Date</label>
+          <input type="date" class="form-control" formControlName="entryDate" />
+        </div>
+        <div class="col-md-3">
+          <label>Type</label>
+          <select class="form-select" formControlName="type">
+            <option value="Income">Income</option>
+            <option value="Expense">Expense</option>
+          </select>
+        </div>
+        <div class="col-md-6 position-relative">
+  <label>Category</label>
+  <input
+    type="text"
+    class="form-control"
+    formControlName="categoryName"
+    (input)="onSearchCategory($event.target.value)"
+    autocomplete="off"
+    placeholder="Enter or select category..."
+  />
+
+  <ul
+    *ngIf="suggestions.length > 0"
+    class="list-group position-absolute w-100 shadow-sm"
+    style="z-index: 1050; max-height: 200px; overflow-y: auto;"
+  >
+    <li
+      *ngFor="let s of suggestions"
+      (click)="selectCategory(s)"
+      class="list-group-item list-group-item-action"
+      style="cursor: pointer;"
+    >
+      {{ s }}
+    </li>
+  </ul>
+</div>
+
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-3">
+          <label>Amount</label>
+          <input type="number" class="form-control" formControlName="amount" />
+        </div>
+        <div class="col-md-3">
+          <label>Payment Mode</label>
+          <select class="form-select" formControlName="paymentMode">
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label>Remarks</label>
+          <input type="text" class="form-control" formControlName="remarks" />
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Save Entry</button>
+    </form>
+  </div>
+</div>
+<!-- 📋 Income/Expense List Below Form -->
+<div class="card mt-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div>
+      <strong>Recent Income / Expense Entries</strong>
+    </div>
+    <div class="d-flex gap-2">
+      <select class="form-select form-select-sm" [(ngModel)]="filterType" (change)="fetchList()">
+        <option value="">All Types</option>
+        <option value="Income">Income</option>
+        <option value="Expense">Expense</option>
+      </select>
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filterFrom" (change)="fetchList()">
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filterTo" (change)="fetchList()">
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-bordered mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Category</th>
+          <th>Amount</th>
+          <th>Payment Mode</th>
+          <th>Remarks</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of incomeExpenseList">
+          <td>{{ row.EntryDate | date:'mediumDate' }}</td>
+          <td>{{ row.Type }}</td>
+          <td>{{ row.CategoryName }}</td>
+          <td>{{ row.Amount | number:'1.2-2' }}</td>
+          <td>{{ row.PaymentMode }}</td>
+          <td>{{ row.Remarks }}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" (click)="deleteEntry(row.EntryId)">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="incomeExpenseList.length === 0">
+          <td colspan="7" class="text-center">No entries found</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component,inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import {
   SidebarComponent,
@@ -7,8 +7,15 @@ import {
   FooterComponent,
   ButtonDirective,
   SidebarNavHelper,   // ✅ required for c-sidebar-nav
-  INavData
+  INavData,
+  
+  ToasterComponent,
+  ToastComponent,
+  ToastHeaderComponent,
+  ToastBodyComponent
 } from '@coreui/angular';
+import { ToastService } from '../../services/toast.service';
+import { NgFor, NgIf  } from '@angular/common';
 
 @Component({
   selector: 'app-default-layout',
@@ -19,13 +26,20 @@ import {
     SidebarNavComponent,
     HeaderComponent,
     FooterComponent,
-    ButtonDirective
+    ButtonDirective,
+    ToasterComponent,
+    ToastComponent,
+    ToastHeaderComponent,
+    ToastBodyComponent,
+    NgFor,
+    NgIf
   ],
   providers: [SidebarNavHelper],   // ✅ fix NG0201
   templateUrl: './default-layout.component.html',
   styleUrls: ['./default-layout.component.scss']
 })
 export class DefaultLayoutComponent {
+  public toastService = inject(ToastService);
   // ✅ Hard-coded menu for beta release
   public sidebarItems: INavData[] = [
     {
@@ -44,10 +58,48 @@ export class DefaultLayoutComponent {
       iconComponent: { name: 'cil-people' }
     },
     {
-      name: 'Delivery',
-      url: '/delivery',
+      name: 'Products',
+      url: '/products',
+      iconComponent: { name: 'cil-truck' }
+    },
+    {
+      name: 'Drivers',
+      url: '/drivers',
+      iconComponent: { name: 'cil-truck' }
+    },
+    {
+      name: 'Vehicles',
+      url: '/vehicles',
+      iconComponent: { name: 'cil-truck' }
+    },
+    {
+      name: 'vehicle-assignment',
+      url: '/vehicle-assignment',
+      iconComponent: { name: 'cil-truck' }
+    },
+    {
+      name: 'PurchaseEntry',
+      url: '/PurchaseEntry',
+      iconComponent: { name: 'cil-truck' }
+    },
+    {
+      name: 'ProductPricing',
+      url: '/ProductPricing',
+      iconComponent: { name: 'cil-truck' }
+    },
+    
+    {
+      name: 'Daily-Delivery',
+      url: '/DailyDelivery',
+      iconComponent: { name: 'cil-truck' }
+    },
+    
+    {
+      name: 'Income-Expense',
+      url: '/IncomeExpenseForm',
       iconComponent: { name: 'cil-truck' }
     }
+
   ];
 
   logout() {

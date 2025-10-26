@@ -1,0 +1,76 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4>Vehicles</h4>
+  <button cButton color="primary" (click)="startAdd()">+ Add Vehicle</button>
+</div>
+
+<!-- List -->
+<table class="table table-striped" *ngIf="!isEditing()">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Vehicle Number</th>
+      <th>Make</th>
+      <th>Model</th>
+      <th>Purchase Date</th>
+      <th>Status</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let v of vehicles(); let i = index">
+      <td>{{ i + 1 }}</td>
+      <td>{{ v.vehicleNumber }}</td>
+      <td>{{ v.make }}</td>
+      <td>{{ v.model }}</td>
+      <td>{{ v.purchaseDate | date }}</td>
+      <td>
+        <span class="badge" [class.bg-success]="v.isActive" [class.bg-secondary]="!v.isActive">
+          {{ v.isActive ? 'Active' : 'Inactive' }}
+        </span>
+      </td>
+      <td>
+        <button cButton size="sm" color="info" (click)="startEdit(v)">Edit</button>
+        <!-- <button cButton size="sm" color="danger" (click)="deactivate(v.vehicleId)">Deactivate</button> -->
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Form -->
+<div *ngIf="isEditing()" class="card p-3">
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="row">
+      <div class="col-md-4 mb-3">
+        <label class="form-label">Vehicle Number</label>
+        <input class="form-control" formControlName="vehicleNumber" />
+      </div>
+      <div class="col-md-4 mb-3">
+        <label class="form-label">Make</label>
+        <input class="form-control" formControlName="make" />
+      </div>
+      <div class="col-md-4 mb-3">
+        <label class="form-label">Model</label>
+        <input class="form-control" formControlName="model" />
+      </div>
+      <div class="col-md-4 mb-3">
+        <label class="form-label">Purchase Date</label>
+        <input type="date" class="form-control" formControlName="purchaseDate" />
+      </div>
+      <div class="mb-3 form-check">
+  <input 
+    type="checkbox" 
+    class="form-check-input" 
+    id="isActive" 
+    formControlName="isActive">
+  <label class="form-check-label" for="isActive">
+    Active
+  </label>
+</div>
+
+    </div>
+    <div>
+      <button cButton color="success" type="submit" [disabled]="form.invalid || loading()">Save</button>
+      <button cButton color="secondary" type="button" (click)="isEditing.set(false)">Cancel</button>
+    </div>
+  </form>
+</div>

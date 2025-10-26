@@ -1,0 +1,79 @@
+<div class="container-fluid">
+  <div class="mb-3 d-flex justify-content-between">
+    <h4>Drivers</h4>
+    <button cButton color="primary" (click)="startCreate()">+ Add Driver</button>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>License</th>
+              <th>Address</th>
+              <th>Status</th>
+              <th style="width:120px">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let d of drivers">
+              <td>{{ d.driverName }}</td>
+              <td>{{ d.phone }}</td>
+              <td>{{ d.licenseNo }}</td>
+              <td>
+                <span class="badge" [class.bg-success]="d.isActive" [class.bg-secondary]="!d.isActive">
+                  {{ d.isActive ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td>
+                <button cButton size="sm" (click)="startEdit(d)">Edit</button>
+                <button cButton size="sm" color="danger" (click)="softDelete(d.driverId)">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inline Form -->
+  <div class="card" *ngIf="isEditing()">
+    <div class="card-header"><strong>{{ editId ? 'Edit Driver' : 'Add Driver' }}</strong></div>
+    <div class="card-body">
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Name *</label>
+            <input class="form-control" formControlName="driverName" />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Phone *</label>
+            <input class="form-control" formControlName="phone" />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">License No *</label>
+            <input class="form-control" formControlName="licenseNo" />
+          </div>
+          <div class="col-md-4">
+  <label class="form-label">Job Type *</label>
+  <select class="form-select" formControlName="jobType">
+    <option value="Driver">Driver</option>
+    <option value="Cleaner">Cleaner</option>
+  </select>
+</div>
+          <div class="col-md-3 d-flex align-items-center">
+            <input class="form-check-input me-2" type="checkbox" formControlName="isActive" id="isActiveChk" />
+            <label class="form-check-label" for="isActiveChk">Active</label>
+          </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+          <button cButton color="primary" type="submit" [disabled]="form.invalid">Save</button>
+          <button cButton color="secondary" type="button" (click)="cancel()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
