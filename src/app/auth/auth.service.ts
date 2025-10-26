@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface PermissionEntry {
   resourceKey: string;
@@ -11,7 +12,7 @@ export interface PermissionEntry {
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly apiBase = 'https://localhost:7183/api';
+  private readonly apiBase = environment.apiUrl;
   private permissions: PermissionEntry[] = [];
 
   constructor(private http: HttpClient) {}
