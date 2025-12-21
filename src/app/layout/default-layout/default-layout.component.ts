@@ -68,6 +68,11 @@ export class DefaultLayoutComponent {
       iconComponent: { name: 'cil-people' }
     },
     {
+      name: 'Customer Credit',
+      url: '/customer-credit',
+      iconComponent: { name: 'cil-credit-card' }
+    },
+    {
       name: 'Drivers',
       url: '/drivers',
       iconComponent: { name: 'cil-truck' }

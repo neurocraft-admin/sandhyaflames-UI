@@ -1,0 +1,333 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              CUSTOMER CREDIT MANAGEMENT API SPECIFICATION                    ║
+║                         Backend Implementation Guide                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📋 OVERVIEW
+-----------
+Create a new CustomerCreditController in your .NET Core API following the existing
+architecture pattern.
+
+Base URL: https://localhost:7183/api
+Controller Route: /api/customer-credit
+
+All stored procedures are already created. Run: sp_CustomerCreditManagement.sql
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 1: GET ALL CUSTOMER CREDITS
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: GET
+URL: /api/customer-credit
+Stored Procedure: sp_GetCustomerCredits
+Parameters: None
+
+RESPONSE (200 OK):
+[
+  {
+    "CreditId": 1,
+    "CustomerId": 3,
+    "CustomerName": "Amit Patel",
+    "CreditLimit": 50000.00,
+    "CreditUsed": 15000.00,
+    "CreditAvailable": 35000.00,
+    "OutstandingAmount": 12000.00,
+    "TotalPaid": 3000.00,
+    "LastPaymentDate": "2025-12-20T10:30:00",
+    "LastPaymentAmount": 1000.00,
+    "IsActive": true,
+    "CreatedAt": "2025-12-01T09:00:00"
+  }
+]
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 2: GET CREDIT BY CUSTOMER ID
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: GET
+URL: /api/customer-credit/customer/{customerId}
+Stored Procedure: sp_GetCreditByCustomerId
+Parameters: @CustomerId (from route)
+
+EXAMPLE: GET /api/customer-credit/customer/3
+
+RESPONSE (200 OK):
+{
+  "CreditId": 1,
+  "CustomerId": 3,
+  "CustomerName": "Amit Patel",
+  "CreditLimit": 50000.00,
+  "CreditUsed": 15000.00,
+  "CreditAvailable": 35000.00,
+  "OutstandingAmount": 12000.00,
+  "TotalPaid": 3000.00,
+  "LastPaymentDate": "2025-12-20T10:30:00",
+  "LastPaymentAmount": 1000.00,
+  "IsActive": true,
+  "CreatedAt": "2025-12-01T09:00:00"
+}
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 3: SET/UPDATE CREDIT LIMIT
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: POST
+URL: /api/customer-credit
+Stored Procedure: sp_SaveCreditLimit
+Content-Type: application/json
+
+REQUEST PAYLOAD:
+{
+  "CustomerId": 3,
+  "CreditLimit": 50000.00,
+  "IsActive": true
+}
+
+RESPONSE (200 OK):
+{
+  "success": 1,
+  "message": "Credit limit created successfully"
+}
+OR
+{
+  "success": 1,
+  "message": "Credit limit updated successfully"
+}
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 4: RECORD PAYMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: POST
+URL: /api/customer-credit/payment
+Stored Procedure: sp_RecordCreditPayment
+Content-Type: application/json
+
+REQUEST PAYLOAD:
+{
+  "CustomerId": 3,
+  "PaymentAmount": 5000.00,
+  "PaymentMode": "Cash",
+  "ReferenceNumber": "PMT-2025-001",
+  "PaymentDate": "2025-12-21",
+  "Remarks": "Partial payment received"
+}
+
+STORED PROCEDURE PARAMETERS MAPPING:
+- CustomerId → @CustomerId
+- PaymentAmount → @PaymentAmount
+- PaymentMode → @PaymentMode (Cash/Card/UPI/Cheque/Bank Transfer)
+- ReferenceNumber → @ReferenceNumber (nullable)
+- PaymentDate → @PaymentDate
+- Remarks → @Remarks (nullable)
+- CreatedBy → @CreatedBy (use logged-in username or 'System')
+
+RESPONSE (200 OK):
+{
+  "success": 1,
+  "message": "Payment recorded successfully"
+}
+
+WHAT HAPPENS INTERNALLY:
+1. Inserts record in CreditPayments table
+2. Inserts transaction in CreditTransactions table (type: Payment)
+3. Updates CustomerCredit:
+   - Decreases OutstandingAmount
+   - Increases TotalPaid
+   - Updates LastPaymentDate and LastPaymentAmount
+   - Recalculates CreditAvailable
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 5: GET TRANSACTIONS BY CUSTOMER
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: GET
+URL: /api/customer-credit/transactions/{customerId}
+Stored Procedure: sp_GetCreditTransactionsByCustomer
+Parameters: @CustomerId (from route)
+
+EXAMPLE: GET /api/customer-credit/transactions/3
+
+RESPONSE (200 OK):
+[
+  {
+    "TransactionId": 5,
+    "CustomerId": 3,
+    "CustomerName": "Amit Patel",
+    "TransactionType": "Payment",
+    "Amount": 5000.00,
+    "ReferenceNumber": "PMT-2025-001",
+    "Description": "Payment received via Cash - Partial payment received",
+    "TransactionDate": "2025-12-21T14:30:00",
+    "CreatedBy": "admin",
+    "CreatedAt": "2025-12-21T14:30:00"
+  },
+  {
+    "TransactionId": 4,
+    "CustomerId": 3,
+    "CustomerName": "Amit Patel",
+    "TransactionType": "Debit",
+    "Amount": 2000.00,
+    "ReferenceNumber": "INV-123",
+    "Description": "Invoice payment",
+    "TransactionDate": "2025-12-20T10:00:00",
+    "CreatedBy": "System",
+    "CreatedAt": "2025-12-20T10:00:00"
+  }
+]
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 6: GET PAYMENT HISTORY
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: GET
+URL: /api/customer-credit/payments (all payments)
+URL: /api/customer-credit/payments/{customerId} (customer-specific)
+Stored Procedure: sp_GetCreditPaymentHistory
+Parameters: @CustomerId (nullable - from route if provided)
+
+EXAMPLE 1: GET /api/customer-credit/payments (all)
+EXAMPLE 2: GET /api/customer-credit/payments/3 (specific customer)
+
+RESPONSE (200 OK):
+[
+  {
+    "PaymentId": 12,
+    "CustomerId": 3,
+    "CustomerName": "Amit Patel",
+    "PaymentAmount": 5000.00,
+    "PaymentMode": "Cash",
+    "ReferenceNumber": "PMT-2025-001",
+    "PaymentDate": "2025-12-21",
+    "Remarks": "Partial payment received",
+    "CreatedAt": "2025-12-21T14:30:00"
+  }
+]
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 7: ADD CREDIT USAGE (Optional - for future integration)
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: POST
+URL: /api/customer-credit/usage
+Stored Procedure: sp_AddCreditUsage
+Content-Type: application/json
+
+REQUEST PAYLOAD:
+{
+  "CustomerId": 3,
+  "Amount": 2000.00,
+  "ReferenceNumber": "INV-456",
+  "Description": "Invoice payment on credit"
+}
+
+RESPONSE (200 OK):
+{
+  "success": 1,
+  "message": "Credit usage recorded successfully"
+}
+
+NOTE: This endpoint can be called from your invoice/sales module when a customer
+makes a purchase on credit.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📝 BACKEND IMPLEMENTATION CHECKLIST
+═══════════════════════════════════════════════════════════════════════════════
+
+☐ 1. Run sp_CustomerCreditManagement.sql to create database objects
+☐ 2. Create CustomerCreditController.cs in Controllers folder
+☐ 3. Add [Route("api/customer-credit")] and [ApiController] attributes
+☐ 4. Inject IConfiguration for connection string
+☐ 5. Implement 6-7 endpoints as specified above
+☐ 6. Handle nullable fields properly (ReferenceNumber, Remarks, LastPaymentDate)
+☐ 7. Use decimal type for all amount fields
+☐ 8. Return proper HTTP status codes (200, 404, 500)
+☐ 9. Add try-catch blocks for error handling
+☐ 10. Test all endpoints with Postman/Swagger
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🎯 IMPLEMENTATION PROMPT FOR .NET DEVELOPER
+═══════════════════════════════════════════════════════════════════════════════
+
+TASK: Create CustomerCreditController in the .NET Core API
+
+REQUIREMENTS:
+1. Follow the existing pattern used in CustomersController
+2. Create controller at: Controllers/CustomerCreditController.cs
+3. Implement 6 RESTful endpoints as specified in this document
+4. Use the stored procedures already created (sp_CustomerCreditManagement.sql)
+5. Map request/response payloads exactly as shown above
+6. Handle nullable fields: ReferenceNumber, Remarks, LastPaymentDate
+7. Use decimal(18,2) for all amount fields
+8. Return success/error responses matching the format above
+9. Use async/await pattern for all database operations
+10. Add proper exception handling and logging
+
+STORED PROCEDURES AVAILABLE:
+- sp_GetCustomerCredits (all customer credits)
+- sp_GetCreditByCustomerId (single customer credit)
+- sp_SaveCreditLimit (insert/update credit limit)
+- sp_RecordCreditPayment (record payment and update balances)
+- sp_GetCreditTransactionsByCustomer (transaction history)
+- sp_GetCreditPaymentHistory (payment history, optional customerId filter)
+- sp_AddCreditUsage (for future sales integration)
+
+KEY BUSINESS LOGIC:
+- Credit Available = Credit Limit - (Credit Used - Total Paid)
+- Outstanding Amount = Credit Used - Total Paid
+- Payment reduces Outstanding Amount and increases Total Paid
+- Debit/Usage increases Credit Used and Outstanding Amount
+
+VALIDATION:
+- Payment amount must be > 0
+- Credit usage must not exceed available credit
+- Customer must exist before creating credit record
+- All date fields use proper datetime/date types
+
+TESTING:
+After implementation, verify:
+✓ GET /api/customer-credit returns all credits
+✓ POST /api/customer-credit creates/updates credit limit
+✓ POST /api/customer-credit/payment records payment correctly
+✓ GET /api/customer-credit/transactions/{id} shows history
+✓ Outstanding amounts calculate correctly
+✓ Available credit updates after payments
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 CURRENT STATUS
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Angular Frontend: COMPLETE
+   - Customer credit model created
+   - Customer credit service created
+   - Credit management component created
+   - Credit limit form
+   - Payment recording form
+   - Transaction history viewer
+   - Routes configured
+   - Navigation menu updated
+
+✅ Database: COMPLETE
+   - CustomerCredit table created
+   - CreditTransactions table created
+   - CreditPayments table created
+   - All stored procedures created
+   - Foreign keys and indexes added
+   - Business logic implemented in SPs
+
+⏳ Backend API: PENDING IMPLEMENTATION
+   - Need to create CustomerCreditController.cs
+   - Need to implement 6 endpoints
+   - Need to test with Angular frontend
+
+═══════════════════════════════════════════════════════════════════════════════
