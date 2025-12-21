@@ -63,6 +63,11 @@ export class DefaultLayoutComponent {
       iconComponent: { name: 'cil-truck' }
     },
     {
+      name: 'Customers',
+      url: '/customers',
+      iconComponent: { name: 'cil-people' }
+    },
+    {
       name: 'Drivers',
       url: '/drivers',
       iconComponent: { name: 'cil-truck' }

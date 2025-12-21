@@ -5,8 +5,10 @@ import { ReactiveFormsModule, FormArray, FormBuilder, Validators, FormGroup, Abs
 import { DailyDeliveryService } from '../../services/daily-delivery.service';
 import { ProductDropdownService, ProductOption } from '../../services/product-dropdown.service';
 import { DriverService } from '../../services/driver.service';
+import { VehicleService } from '../../services/vehicle.service';
 import { ToastService } from '../../services/toast.service';
 import { DeliveryCloseRequest } from '../../models/daily-delivery.model';
+import { Vehicle } from '../../models/vehicle.model';
 import { RouterModule } from '@angular/router';
 
 @Component({
@@ -21,17 +23,24 @@ export class DailyDeliveryComponent {
   private svc = inject(DailyDeliveryService);
   private productSvc = inject(ProductDropdownService);
   private driverSvc = inject(DriverService);
+  private vehicleSvc = inject(VehicleService);
   private toast = inject(ToastService);
+
+  assignedDriverName: string = '';
+  assignedDriverId: number | null = null;
+  assignedVehicleNumber: string = '';
+  assignedVehicleId: number | null = null;
 
   products: ProductOption[] = [];
   drivers: any[] = [];
+  vehicles: Vehicle[] = [];
   deliveries: any[] = [];
-  selectedVehicleNo: string = '';
   isEditing = signal(true);
 
   form = this.fb.group({
     deliveryDate: [this.today(), Validators.required],
     driverId: [0, Validators.required],
+    vehicleId: [0, Validators.required],
     startTime: ['08:00:00', Validators.required],
     returnTime: [null],
     remarks: [''],
@@ -56,6 +65,14 @@ export class DailyDeliveryComponent {
     this.addItemRow();
     this.loadDeliveries(); // Load existing list
   }
+  loadDriversForVehicle(vehicleId: number) {
+      this.svc.getDriversForVehicle(vehicleId).subscribe(res => {
+        this.assignedDriverId = res.assignedDriverId;
+        this.assignedDriverName = res.assignedDriverName;
+        this.drivers = res.drivers;
+        this.form.patchValue({ driverId: 0 }); // default: blank/optional
+      });
+    }
 
   /* Form row controls */
   addItemRow() {
@@ -146,21 +163,43 @@ onProductChange(itemGroup: FormGroup, product?: any) {
 
   onDriverChange() {
     const driverId = this.form.get('driverId')?.value;
-    if (!driverId) return;
+    if (!driverId || driverId === 0) {
+      this.vehicles = [];
+      this.assignedVehicleNumber = '';
+      this.assignedVehicleId = null;
+      this.form.patchValue({ vehicleId: 0 });
+      return;
+    }
 
+    // First, get the assigned vehicle for this driver
     this.driverSvc.getVehicleByDriver(driverId).subscribe({
       next: (res) => {
         if (res) {
-          this.selectedVehicleNo = res.vehicleNo;
-          this.toast.success(`Vehicle assigned: ${res.vehicleNo}`);
+          this.assignedVehicleNumber = res.vehicleNo;
+          this.assignedVehicleId = res.vehicleId;
+          // Set the assigned vehicle as default
+          this.form.patchValue({ vehicleId: res.vehicleId });
         } else {
-          this.selectedVehicleNo = '';
-          this.toast.error('No active vehicle for this driver');
+          this.assignedVehicleNumber = '';
+          this.assignedVehicleId = null;
+          this.form.patchValue({ vehicleId: 0 });
         }
       },
       error: () => {
-        this.selectedVehicleNo = '';
-        this.toast.error('No active vehicle for this driver');
+        this.assignedVehicleNumber = '';
+        this.assignedVehicleId = null;
+        this.form.patchValue({ vehicleId: 0 });
+      }
+    });
+
+    // Get all active vehicles for dropdown
+    this.vehicleSvc.getVehicles().subscribe({
+      next: (vehicles) => {
+        this.vehicles = vehicles.filter(v => v.isActive);
+      },
+      error: () => {
+        this.vehicles = [];
+        this.toast.error('Failed to load vehicles');
       }
     });
   }
@@ -175,7 +214,7 @@ onProductChange(itemGroup: FormGroup, product?: any) {
     console.log('Form value:', this.form.value);
     console.log('Form valid:', this.form.valid);
     if (this.form.invalid) {
-    this.toast.error('Please select driver, date and start time');
+    this.toast.error('Please select driver, vehicle, date and start time');
     return;
   }
   if (this.items.length === 0) {
@@ -187,7 +226,10 @@ onProductChange(itemGroup: FormGroup, product?: any) {
     this.svc.create(payload as any).subscribe({
       next: () => {
         this.toast.success('Delivery created');
-        this.form.reset({ deliveryDate: this.today(), startTime: '08:00:00', driverId: 0 });
+        this.form.reset({ deliveryDate: this.today(), startTime: '08:00:00', driverId: 0, vehicleId: 0 });
+        this.vehicles = [];
+        this.assignedVehicleNumber = '';
+        this.assignedVehicleId = null;
         this.items.clear();
         this.addItemRow();
         this.loadDeliveries();

@@ -50,6 +50,9 @@ closeDelivery(id: number) {
 getDeliveryById(id: number) {
   return this.http.get<any>(`/api/dailydelivery/${id}`);
 }
+getDriversForVehicle(vehicleId: number) {
+  return this.http.get<any>(`/api/dailydelivery/drivers-for-vehicle?vehicleId=${vehicleId}`);
+}
 
 
 }

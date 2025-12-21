@@ -14,8 +14,14 @@
           </div>
 
           <!-- Driver -->
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label for="driverSelect" class="form-label">Driver</label>
+
+            <!-- Assigned driver label (shows the assigned driver) -->
+            <div style="font-weight: bold; color: #0d6efd; margin-bottom: 3px;">
+              Assigned Driver: {{ assignedDriverName || 'None' }}
+            </div>
+
             <select id="driverSelect" class="form-select" formControlName="driverId" (change)="onDriverChange()">
               <option [ngValue]="0">-- Select Driver --</option>
               <option *ngFor="let d of drivers" [ngValue]="d.driverId">
@@ -25,9 +31,20 @@
           </div>
 
           <!-- Vehicle -->
-          <div class="col-md-3">
-            <label for="vehicleBox" class="form-label">Vehicle</label>
-            <input id="vehicleBox" type="text" class="form-control" [value]="selectedVehicleNo" readonly />
+          <div class="col-md-4">
+            <label for="vehicleSelect" class="form-label">Vehicle</label>
+
+            <!-- Assigned vehicle label (shows the default/assigned vehicle) -->
+            <div style="font-weight: bold; color: #0d6efd; margin-bottom: 3px;">
+              Assigned Vehicle: {{ assignedVehicleNumber || 'None' }}
+            </div>
+
+            <select id="vehicleSelect" class="form-select" formControlName="vehicleId">
+              <option [ngValue]="0">-- Select Vehicle --</option>
+              <option *ngFor="let v of vehicles" [ngValue]="v.vehicleId">
+                {{ v.vehicleNumber }}
+              </option>
+            </select>
           </div>
         </div>
 
