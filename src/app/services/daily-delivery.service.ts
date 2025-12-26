@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { DailyDelivery, DeliveryCloseRequest } from '../models/daily-delivery.model';
+import { DailyDeliveryItemActual, UpdateItemActualsRequest, DeliveryWithItems, CloseDeliveryWithItemsRequest } from '../models/daily-delivery-item-actual.model';
 
 const URL = `${environment.apiUrl}/dailydelivery`;
 
@@ -54,5 +55,42 @@ getDriversForVehicle(vehicleId: number) {
   return this.http.get<any>(`/api/dailydelivery/drivers-for-vehicle?vehicleId=${vehicleId}`);
 }
 
+/* Initialize item actuals for a delivery */
+initializeItemActuals(deliveryId: number): Observable<{ success: number; message: string }> {
+  return this.http.post<{ success: number; message: string }>(
+    `${URL}/${deliveryId}/items/initialize`,
+    {}
+  );
+}
+
+/* Get item-level actuals for a delivery */
+getItemActuals(deliveryId: number): Observable<DailyDeliveryItemActual[]> {
+  return this.http.get<DailyDeliveryItemActual[]>(
+    `${URL}/${deliveryId}/items/actuals`
+  );
+}
+
+/* Update item-level actuals */
+updateItemActuals(deliveryId: number, request: UpdateItemActualsRequest): Observable<{ success: number; message: string }> {
+  return this.http.put<{ success: number; message: string }>(
+    `${URL}/${deliveryId}/items/actuals`,
+    request
+  );
+}
+
+/* Get delivery with item actuals (combined) */
+getDeliveryWithItems(deliveryId: number): Observable<DeliveryWithItems> {
+  return this.http.get<DeliveryWithItems>(
+    `${URL}/${deliveryId}/with-items`
+  );
+}
+
+/* Close delivery with item verification */
+closeDeliveryWithItems(deliveryId: number, request: CloseDeliveryWithItemsRequest): Observable<{ success: number; message: string }> {
+  return this.http.put<{ success: number; message: string }>(
+    `${URL}/${deliveryId}/close-with-items`,
+    request
+  );
+}
 
 }

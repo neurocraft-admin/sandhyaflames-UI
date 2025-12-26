@@ -55,12 +55,12 @@ export class DefaultLayoutComponent {
     {
       name: 'Roles',
       url: '/roles',
-      iconComponent: { name: 'cil-people' }
+      iconComponent: { name: 'cil-shield-alt' }
     },
     {
       name: 'Products',
       url: '/products',
-      iconComponent: { name: 'cil-truck' }
+      iconComponent: { name: 'cil-layers' }
     },
     {
       name: 'Customers',
@@ -75,7 +75,7 @@ export class DefaultLayoutComponent {
     {
       name: 'Drivers',
       url: '/drivers',
-      iconComponent: { name: 'cil-truck' }
+      iconComponent: { name: 'cil-user-follow' }
     },
     {
       name: 'Vehicles',
@@ -83,31 +83,38 @@ export class DefaultLayoutComponent {
       iconComponent: { name: 'cil-truck' }
     },
     {
-      name: 'vehicle-assignment',
+      name: 'Vehicle Assignment',
       url: '/vehicle-assignment',
-      iconComponent: { name: 'cil-truck' }
+      iconComponent: { name: 'cil-transfer' }
     },
     {
-      name: 'PurchaseEntry',
+      name: 'Purchase Entry',
       url: '/PurchaseEntry',
-      iconComponent: { name: 'cil-truck' }
+      iconComponent: { name: 'cil-cart' }
     },
     {
-      name: 'ProductPricing',
+      name: 'Product Pricing',
       url: '/ProductPricing',
-      iconComponent: { name: 'cil-truck' }
+      iconComponent: { name: 'cil-dollar' }
     },
-    
     {
-      name: 'Daily-Delivery',
-      url: '/DailyDelivery',
-      iconComponent: { name: 'cil-truck' }
+      name: 'Daily Delivery',
+      iconComponent: { name: 'cil-bullhorn' },
+      children: [
+        {
+          name: 'All Deliveries',
+          url: '/DailyDelivery'
+        },
+        {
+          name: 'Commercial Deliveries',
+          url: '/CommercialDeliveries'
+        }
+      ]
     },
-    
     {
-      name: 'Income-Expense',
+      name: 'Income & Expense',
       url: '/IncomeExpenseForm',
-      iconComponent: { name: 'cil-truck' }
+      iconComponent: { name: 'cil-wallet' }
     }
 
   ];

@@ -68,6 +68,14 @@
             <input id="remarks" type="text" class="form-control" formControlName="remarks"
               placeholder="Optional remarks..." />
           </div>
+
+          <!-- Has Credit Customers -->
+          <div class="col-md-3 d-flex align-items-center pt-4">
+            <input class="form-check-input me-2" type="checkbox" formControlName="hasCreditCustomers" id="creditCustomersChk" />
+            <label class="form-check-label" for="creditCustomersChk">
+              <strong>Has Credit Customers</strong>
+            </label>
+          </div>
         </div>
 
         <!-- ===== Product Items ===== -->
@@ -153,12 +161,15 @@
               <button class="btn btn-info btn-sm me-1" (click)="recompute(d.DeliveryId)">
                 Recompute
               </button>
-              <button class="btn btn-success btn-sm" (click)="closeDelivery(d.DeliveryId)"
+              <button class="btn btn-success btn-sm me-1" (click)="closeDelivery(d.DeliveryId)"
                 [disabled]="d.status === 'Closed'">
                 Close
               </button>
               <button class="btn btn-warning btn-sm me-1" [routerLink]="['/DailyDeliveryUpdate', d.DeliveryId]">
                 Update
+              </button>
+              <button class="btn btn-primary btn-sm" [routerLink]="['/DeliveryMapping', d.DeliveryId]">
+                Map Customers
               </button>
             </td>
           </tr>

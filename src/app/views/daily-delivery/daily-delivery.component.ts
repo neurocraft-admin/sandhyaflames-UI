@@ -9,7 +9,7 @@ import { VehicleService } from '../../services/vehicle.service';
 import { ToastService } from '../../services/toast.service';
 import { DeliveryCloseRequest } from '../../models/daily-delivery.model';
 import { Vehicle } from '../../models/vehicle.model';
-import { RouterModule } from '@angular/router';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-daily-delivery',
@@ -25,6 +25,8 @@ export class DailyDeliveryComponent {
   private driverSvc = inject(DriverService);
   private vehicleSvc = inject(VehicleService);
   private toast = inject(ToastService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   assignedDriverName: string = '';
   assignedDriverId: number | null = null;
@@ -44,6 +46,7 @@ export class DailyDeliveryComponent {
     startTime: ['08:00:00', Validators.required],
     returnTime: [null],
     remarks: [''],
+    hasCreditCustomers: [false],
     items: this.fb.array([])
   });
 
@@ -62,6 +65,14 @@ export class DailyDeliveryComponent {
     },
     error: e => console.error('Driver load error', e)
   });
+    
+    // Check for edit query param
+    this.route.queryParams.subscribe(params => {
+      const editId = params['edit'];
+      if (editId) {
+        this.loadDeliveryForEdit(Number(editId));
+      }
+    });
     this.addItemRow();
     this.loadDeliveries(); // Load existing list
   }
@@ -209,6 +220,18 @@ onProductChange(itemGroup: FormGroup, product?: any) {
     return payload;
   }
 
+  /* Load delivery for editing */
+  loadDeliveryForEdit(deliveryId: number) {
+    // Note: You'll need to create a getDeliveryById method in your service
+    // For now, this is a placeholder that shows the structure
+    this.toast.info('Edit functionality requires backend API implementation');
+    // Clear query params after loading
+    this.router.navigate([], { 
+      queryParams: {}, 
+      queryParamsHandling: 'merge' 
+    });
+  }
+
   /* Create new delivery */
   submit() {
     console.log('Form value:', this.form.value);
@@ -226,7 +249,7 @@ onProductChange(itemGroup: FormGroup, product?: any) {
     this.svc.create(payload as any).subscribe({
       next: () => {
         this.toast.success('Delivery created');
-        this.form.reset({ deliveryDate: this.today(), startTime: '08:00:00', driverId: 0, vehicleId: 0 });
+        this.form.reset({ deliveryDate: this.today(), startTime: '08:00:00', driverId: 0, vehicleId: 0, hasCreditCustomers: false });
         this.vehicles = [];
         this.assignedVehicleNumber = '';
         this.assignedVehicleId = null;

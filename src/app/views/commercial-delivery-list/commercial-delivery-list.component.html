@@ -1,0 +1,67 @@
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header>
+        <strong>Commercial Deliveries - Customer Mapping</strong>
+        <small class="text-muted ms-2">(All deliveries - use Map Customers to assign commercial cylinders)</small>
+      </c-card-header>
+      <c-card-body>
+        <div *ngIf="loading()" class="text-center">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+
+        <table *ngIf="!loading()" cTable striped hover>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Driver</th>
+              <th>Vehicle</th>
+              <th>Start Time</th>
+              <th>Return Time</th>
+              <th>Remarks</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let delivery of deliveries()">
+              <td>{{ (delivery.DeliveryDate || delivery.deliveryDate) | date: 'dd/MM/yyyy' }}</td>
+              <td>{{ delivery.DriverName || delivery.driverName || '-' }}</td>
+              <td>{{ delivery.VehicleNumber || delivery.vehicleNumber || '-' }}</td>
+              <td>{{ delivery.StartTime || delivery.startTime || '-' }}</td>
+              <td>{{ delivery.ReturnTime || delivery.returnTime || '-' }}</td>
+              <td>{{ delivery.Remarks || delivery.remarks || '-' }}</td>
+              <td>
+                <button
+                  cButton
+                  color="primary"
+                  size="sm"
+                  class="me-2"
+                  (click)="mapCustomers(delivery.DeliveryId || delivery.deliveryId || 0)"
+                  title="Map Customers">
+                  <svg cIcon name="cilPeople" class="me-1"></svg>
+                  Map Customers
+                </button>
+                <button
+                  cButton
+                  color="warning"
+                  size="sm"
+                  variant="outline"
+                  (click)="editDelivery(delivery.DeliveryId || delivery.deliveryId || 0)"
+                  title="Edit Delivery">
+                  <svg cIcon name="cilPencil"></svg>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="deliveries().length === 0">
+              <td colspan="7" class="text-center text-muted">
+                No deliveries found
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

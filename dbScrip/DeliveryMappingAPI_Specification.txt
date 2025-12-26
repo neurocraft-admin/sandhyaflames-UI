@@ -1,0 +1,293 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║          DELIVERY CUSTOMER MAPPING API SPECIFICATION                         ║
+║       Commercial Cylinder Customer Assignment & Credit Integration           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📋 OVERVIEW
+-----------
+Create DeliveryMappingController to handle commercial cylinder customer assignments
+and integrate with the customer credit system.
+
+Base URL: https://localhost:7183/api
+Controller Route: /api/delivery-mapping
+
+All stored procedures are already created. Run: sp_DeliveryMapping.sql
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 1: GET COMMERCIAL ITEMS FOR A DELIVERY
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: GET
+URL: /api/delivery-mapping/commercial-items/{deliveryId}
+Stored Procedure: sp_GetCommercialItemsByDelivery
+Parameters: @DeliveryId (from route)
+
+EXAMPLE: GET /api/delivery-mapping/commercial-items/5
+
+RESPONSE (200 OK):
+[
+  {
+    "DeliveryId": 5,
+    "ProductId": 3,
+    "ProductName": "19kg Commercial Cylinder",
+    "CategoryName": "Commercial Cylinder",
+    "NoOfCylinders": 20,
+    "NoOfInvoices": 15,
+    "NoOfDeliveries": 15,
+    "MappedQuantity": 8,
+    "RemainingQuantity": 12,
+    "SellingPrice": 1200.00
+  }
+]
+
+BUSINESS LOGIC:
+- Only returns items from "Commercial" category
+- MappedQuantity = sum of all customer mappings for this item
+- RemainingQuantity = NoOfCylinders - MappedQuantity
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 2: GET MAPPINGS BY DELIVERY
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: GET
+URL: /api/delivery-mapping/delivery/{deliveryId}
+Stored Procedure: sp_GetMappingsByDelivery
+Parameters: @DeliveryId (from route)
+
+EXAMPLE: GET /api/delivery-mapping/delivery/5
+
+RESPONSE (200 OK):
+[
+  {
+    "MappingId": 25,
+    "DeliveryId": 5,
+    "ProductId": 3,
+    "ProductName": "19kg Commercial Cylinder",
+    "CustomerId": 8,
+    "CustomerName": "Raj Restaurant",
+    "Quantity": 5,
+    "SellingPrice": 1200.00,
+    "TotalAmount": 6000.00,
+    "IsCreditSale": true,
+    "PaymentMode": "Credit",
+    "InvoiceNumber": "INV-2025-123",
+    "Remarks": "Monthly supply",
+    "CreatedAt": "2025-12-21T10:30:00"
+  }
+]
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 3: GET DELIVERY MAPPING SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: GET
+URL: /api/delivery-mapping/summary/{deliveryId}
+Stored Procedure: sp_GetDeliveryMappingSummary
+Parameters: @DeliveryId (from route)
+
+EXAMPLE: GET /api/delivery-mapping/summary/5
+
+RESPONSE (200 OK):
+{
+  "DeliveryId": 5,
+  "DeliveryDate": "2025-12-21",
+  "DriverName": "Ramesh Kumar",
+  "VehicleNo": "KA-01-AB-1234",
+  "TotalCommercialCylinders": 20,
+  "MappedCylinders": 8,
+  "UnmappedCylinders": 12
+}
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 4: CREATE CUSTOMER MAPPING
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: POST
+URL: /api/delivery-mapping
+Stored Procedure: sp_CreateCustomerMapping
+Content-Type: application/json
+
+REQUEST PAYLOAD:
+{
+  "DeliveryId": 5,
+  "ProductId": 3,
+  "CustomerId": 8,
+  "Quantity": 5,
+  "IsCreditSale": true,
+  "PaymentMode": "Credit",
+  "InvoiceNumber": "INV-2025-123",
+  "Remarks": "Monthly supply for restaurant"
+}
+
+STORED PROCEDURE PARAMETERS:
+- DeliveryId → @DeliveryId
+- ProductId → @ProductId
+- CustomerId → @CustomerId
+- Quantity → @Quantity
+- IsCreditSale → @IsCreditSale
+- PaymentMode → @PaymentMode (Cash/Credit/Card/UPI)
+- InvoiceNumber → @InvoiceNumber (nullable)
+- Remarks → @Remarks (nullable)
+
+RESPONSE (200 OK):
+{
+  "success": 1,
+  "message": "Customer mapping created successfully"
+}
+
+BUSINESS LOGIC - WHAT HAPPENS:
+1. Validates delivery, item, and customer exist
+2. Gets selling price from DailyDeliveryItems (frozen at delivery time)
+3. Checks if quantity exceeds remaining unmapped cylinders
+4. Calculates TotalAmount = SellingPrice × Quantity
+5. Inserts record in DailyDeliveryCustomerMapping
+6. IF IsCreditSale = true:
+   a. Calls sp_AddCreditUsage to update CustomerCredit
+   b. Inserts transaction in CreditTransactions (type: Debit)
+   c. Increases customer's CreditUsed and OutstandingAmount
+   d. Decreases CreditAvailable
+
+ERROR RESPONSES:
+{
+  "message": "Delivery not found"
+}
+{
+  "message": "Quantity exceeds available cylinders"
+}
+{
+  "message": "Insufficient credit available"
+}
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 5: DELETE CUSTOMER MAPPING
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: DELETE
+URL: /api/delivery-mapping/{mappingId}
+Stored Procedure: sp_DeleteCustomerMapping
+Parameters: @MappingId (from route)
+
+EXAMPLE: DELETE /api/delivery-mapping/25
+
+RESPONSE (200 OK):
+{
+  "success": 1,
+  "message": "Mapping deleted successfully"
+}
+
+BUSINESS LOGIC - WHAT HAPPENS:
+1. Gets mapping details (CustomerId, TotalAmount, IsCreditSale)
+2. IF IsCreditSale = true:
+   a. Reverses credit usage in CustomerCredit
+   b. Decreases CreditUsed
+   c. Increases CreditAvailable
+   d. Decreases OutstandingAmount
+3. Deletes record from DailyDeliveryCustomerMapping
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📝 BACKEND IMPLEMENTATION CHECKLIST
+═══════════════════════════════════════════════════════════════════════════════
+
+☐ 1. Run sp_DeliveryMapping.sql to create database objects
+☐ 2. Ensure sp_CustomerCreditManagement.sql is already executed
+☐ 3. Create DeliveryMappingController.cs in Controllers folder
+☐ 4. Add [Route("api/delivery-mapping")] and [ApiController] attributes
+☐ 5. Inject IConfiguration for connection string
+☐ 6. Implement 5 endpoints as specified above
+☐ 7. Handle nullable fields (InvoiceNumber, Remarks)
+☐ 8. Use decimal type for all amount fields
+☐ 9. Return proper HTTP status codes (200, 404, 500)
+☐ 10. Add try-catch blocks for error handling
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🎯 IMPLEMENTATION PROMPT FOR .NET DEVELOPER
+═══════════════════════════════════════════════════════════════════════════════
+
+TASK: Create DeliveryMappingController in the .NET Core API
+
+REQUIREMENTS:
+1. Follow existing pattern used in CustomersController
+2. Create controller at: Controllers/DeliveryMappingController.cs
+3. Implement 5 RESTful endpoints as specified
+4. Use the stored procedures (sp_DeliveryMapping.sql)
+5. Map request/response payloads exactly as shown
+6. Handle nullable fields: InvoiceNumber, Remarks
+7. Use decimal(18,2) for all amount fields
+8. Integrate with Customer Credit system (sp_AddCreditUsage)
+9. Use async/await pattern
+10. Add proper exception handling
+
+STORED PROCEDURES AVAILABLE:
+- sp_GetCommercialItemsByDelivery (commercial items with remaining qty)
+- sp_GetMappingsByDelivery (customer mappings for delivery)
+- sp_GetDeliveryMappingSummary (summary with mapped/unmapped counts)
+- sp_CreateCustomerMapping (create mapping, handle credit sales)
+- sp_DeleteCustomerMapping (delete mapping, reverse credit if needed)
+
+KEY BUSINESS LOGIC:
+- Commercial cylinders may not have invoices at delivery time
+- Credit sales automatically update CustomerCredit table
+- Deleting a credit sale mapping reverses the credit usage
+- Quantity validation prevents over-mapping
+- Selling price is frozen from delivery time (not current price)
+
+CREDIT INTEGRATION:
+When IsCreditSale = true, the stored procedure automatically:
+1. Calls sp_AddCreditUsage
+2. Validates credit availability
+3. Updates CreditUsed, CreditAvailable, OutstandingAmount
+4. Creates transaction record in CreditTransactions
+
+VALIDATION:
+- Quantity must not exceed RemainingQuantity
+- Customer must have sufficient credit if IsCreditSale = true
+- Delivery and customer must exist and be active
+
+TESTING:
+After implementation, verify:
+✓ GET commercial-items shows only commercial category items
+✓ POST creates mapping and updates credit if IsCreditSale = true
+✓ DELETE removes mapping and reverses credit usage
+✓ Summary shows correct mapped/unmapped counts
+✓ Credit Available decreases when credit sale is created
+✓ Credit Available increases when credit sale is deleted
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 CURRENT STATUS
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Angular Frontend: COMPLETE
+   - Delivery mapping model created
+   - Delivery mapping service created
+   - Mapping component with forms created
+   - Commercial items display
+   - Customer assignment form
+   - Credit sale checkbox
+   - Mapping list with delete
+   - Progress summary (total/mapped/unmapped)
+   - Routes configured
+   - Link added to Daily Delivery list
+
+✅ Database: COMPLETE
+   - DailyDeliveryCustomerMapping table created
+   - All stored procedures created
+   - Foreign keys to DailyDelivery, DailyDeliveryItems, Customers
+   - Indexes for performance
+   - Credit integration logic in sp_CreateCustomerMapping
+   - Reverse credit logic in sp_DeleteCustomerMapping
+
+⏳ Backend API: PENDING IMPLEMENTATION
+   - Need to create DeliveryMappingController.cs
+   - Need to implement 5 endpoints
+   - Need to test with Angular frontend
+   - Need to verify credit integration
+
+═══════════════════════════════════════════════════════════════════════════════

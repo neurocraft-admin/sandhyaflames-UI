@@ -1,56 +1,186 @@
-<div class="card">
-  <div class="card-header"><strong>Update Delivery</strong></div>
-  <div class="card-body">
-    <form [formGroup]="form" (ngSubmit)="save()">
-      <div class="row mb-3">
-        <div class="col-md-4">
-          <label>Driver</label>
-          <input class="form-control" [value]="driver.DriverName" disabled />
-        </div>
-        <div class="col-md-4">
-          <label>Vehicle</label>
-          <input class="form-control" [value]="header.VehicleNumber" disabled />
-        </div>
-        <div class="col-md-4">
-          <label>Date</label>
-          <input class="form-control" [value]="header.DeliveryDate | date:'shortDate'" disabled />
+<div class="container mt-3">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Update Daily Delivery - Item-Level Tracking</h5>
+    </div>
+    <div class="card-body">
+      
+      <!-- Loading Spinner -->
+      <div *ngIf="loading()" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
         </div>
       </div>
 
-      <div class="row mb-3">
-        <div class="col-md-4">
-          <label>Return Time</label>
-          <input class="form-control" formControlName="returnTime" type="time" />
+      <!-- Main Form -->
+      <form [formGroup]="form" *ngIf="!loading()">
+        
+        <!-- Delivery Info Summary -->
+        <div class="alert alert-info mb-4" *ngIf="deliveryInfo">
+          <div class="row">
+            <div class="col-md-3">
+              <strong>Delivery Date:</strong><br>
+              {{ deliveryInfo.deliveryDate | date: 'dd/MM/yyyy' }}
+            </div>
+            <div class="col-md-3">
+              <strong>Vehicle:</strong><br>
+              {{ deliveryInfo.vehicleNumber }}
+            </div>
+            <div class="col-md-3">
+              <strong>Status:</strong><br>
+              <span class="badge" [class.bg-success]="deliveryInfo.status === 'Closed'" 
+                    [class.bg-warning]="deliveryInfo.status === 'Open'">
+                {{ deliveryInfo.status }}
+              </span>
+            </div>
+            <div class="col-md-3">
+              <strong>Total Items:</strong><br>
+              {{ itemsFormArray.length }}
+            </div>
+          </div>
         </div>
-        <div class="col-md-4">
-          <label>Completed Invoices</label>
-          <input class="form-control" formControlName="completedInvoices" type="number" />
-        </div>
-        <div class="col-md-4">
-          <label>Pending Invoices</label>
-          <input class="form-control" formControlName="pendingInvoices" type="number" />
-        </div>
-      </div>
 
-      <div class="row mb-3">
-        <div class="col-md-4">
-          <label>Cash Collected</label>
-          <input class="form-control" formControlName="cashCollected" type="number" />
+        <!-- Item-Level Tracking Table -->
+        <h6 class="mb-3">Item-Wise Delivery Status</h6>
+        <div class="table-responsive mb-4">
+          <table class="table table-bordered table-sm">
+            <thead class="table-light">
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Planned</th>
+                <th>Delivered</th>
+                <th>Pending</th>
+                <th>Unit Price</th>
+                <th>Cash Collected</th>
+                <th>Status</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody formArrayName="items">
+              <tr *ngFor="let item of itemsFormArray.controls; let i = index" [formGroupName]="i">
+                <!-- Product Name -->
+                <td>
+                  <strong>{{ item.get('productName')?.value }}</strong>
+                </td>
+                
+                <!-- Category -->
+                <td>
+                  <small class="text-muted">{{ item.get('categoryName')?.value }}</small>
+                </td>
+                
+                <!-- Planned Quantity (readonly) -->
+                <td class="text-center">
+                  <strong>{{ item.get('plannedQuantity')?.value }}</strong>
+                </td>
+                
+                <!-- Delivered Quantity (editable) -->
+                <td>
+                  <input type="number" 
+                         class="form-control form-control-sm" 
+                         formControlName="deliveredQuantity"
+                         min="0"
+                         [max]="item.get('plannedQuantity')?.value">
+                </td>
+                
+                <!-- Pending Quantity (auto-calculated) -->
+                <td class="text-center">
+                  <span class="badge bg-secondary">
+                    {{ item.get('pendingQuantity')?.value }}
+                  </span>
+                </td>
+                
+                <!-- Unit Price (readonly) -->
+                <td class="text-end">
+                  {{ item.get('unitPrice')?.value | currency:'INR' }}
+                </td>
+                
+                <!-- Cash Collected (editable) -->
+                <td>
+                  <input type="number" 
+                         class="form-control form-control-sm" 
+                         formControlName="cashCollected"
+                         min="0"
+                         step="0.01">
+                  <small class="text-muted">
+                    Expected: {{ calculateTotalAmount(i) | currency:'INR' }}
+                  </small>
+                </td>
+                
+                <!-- Status Badge -->
+                <td class="text-center">
+                  <span [class]="getItemStatusClass(i)">
+                    {{ getItemStatus(i) }}
+                  </span>
+                </td>
+                
+                <!-- Remarks -->
+                <td>
+                  <input type="text" 
+                         class="form-control form-control-sm" 
+                         formControlName="remarks"
+                         placeholder="Optional notes">
+                </td>
+              </tr>
+              
+              <!-- Empty State -->
+              <tr *ngIf="itemsFormArray.length === 0">
+                <td colspan="9" class="text-center text-muted">
+                  No items found for this delivery
+                </td>
+              </tr>
+            </tbody>
+            
+            <!-- Totals Footer -->
+            <tfoot class="table-secondary">
+              <tr>
+                <th colspan="3" class="text-end">Totals:</th>
+                <th class="text-center">{{ getTotalDelivered() }}</th>
+                <th class="text-center">{{ getTotalPending() }}</th>
+                <th></th>
+                <th class="text-end">{{ getTotalCashCollected() | currency:'INR' }}</th>
+                <th colspan="2"></th>
+              </tr>
+            </tfoot>
+          </table>
         </div>
-        <div class="col-md-4">
-          <label>Empty Cylinders Returned</label>
-          <input class="form-control" formControlName="emptyCylindersReturned" type="number" />
-        </div>
-        <div class="col-md-4">
-          <label>Remarks</label>
-          <input class="form-control" formControlName="remarks" />
-        </div>
-      </div>
 
-      <div class="d-flex gap-2">
-        <button class="btn btn-success" type="submit">Save Update</button>
-        <button class="btn btn-danger" type="button" (click)="closeDelivery()">Close Delivery</button>
-      </div>
-    </form>
+        <!-- Delivery Closure Section -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Return Time <span class="text-danger">*</span></label>
+            <input type="time" class="form-control" formControlName="returnTime">
+          </div>
+          
+          <div class="col-md-4">
+            <label class="form-label">Empty Cylinders Returned</label>
+            <input type="number" class="form-control" formControlName="emptyCylindersReturned" min="0">
+          </div>
+          
+          <div class="col-md-4">
+            <label class="form-label">Overall Remarks</label>
+            <input type="text" class="form-control" formControlName="remarks" placeholder="Optional">
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-between">
+          <button type="button" class="btn btn-secondary" (click)="cancel()">
+            Cancel
+          </button>
+          
+          <div>
+            <button type="button" class="btn btn-primary me-2" (click)="saveItems()">
+              Save Items
+            </button>
+            
+            <button type="button" class="btn btn-success" (click)="closeDelivery()" 
+                    [disabled]="form.invalid">
+              Save & Close Delivery
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
