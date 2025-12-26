@@ -1,0 +1,332 @@
+=============================================
+STOCK REGISTER UI NOT SHOWING DATA - DEBUG STEPS
+=============================================
+
+ISSUE: Stock Register initialized (11 records in DB) but UI table is empty
+
+DIAGNOSIS STEPS:
+-----------------
+
+STEP 1: CHECK API RESPONSE FORMAT
+----------------------------------
+
+Open browser DevTools (F12) → Network tab → Reload Stock Register page
+
+Look for request to: GET /api/stockregister
+
+**Check the Response:**
+Click on the request → Preview/Response tab
+
+EXPECTED FORMAT (camelCase):
+```json
+[
+  {
+    "stockId": 1,
+    "productId": 1,
+    "productName": "19kg HP Cylinder",
+    "categoryName": "Gas Cylinder",
+    "subCategoryName": "Commercial",
+    "filledStock": 0,
+    "emptyStock": 0,
+    "damagedStock": 0,
+    "totalStock": 0,
+    "lastUpdated": "2025-12-26T10:30:00",
+    "updatedBy": null
+  }
+]
+```
+
+PROBLEM CASE (PascalCase):
+```json
+[
+  {
+    "StockId": 1,
+    "ProductId": 1,
+    "ProductName": "19kg HP Cylinder",
+    "CategoryName": "Gas Cylinder",
+    "SubCategoryName": "Commercial",
+    "FilledStock": 0,
+    "EmptyStock": 0,
+    "DamagedStock": 0,
+    "TotalStock": 0,
+    "LastUpdated": "2025-12-26T10:30:00",
+    "UpdatedBy": null
+  }
+]
+```
+
+❌ **IF API RETURNS PascalCase (Capital letters):**
+Angular can't match the properties. Need to fix backend.
+
+
+STEP 2: CHECK BROWSER CONSOLE FOR ERRORS
+-----------------------------------------
+
+Open browser console (F12) → Console tab
+
+Look for errors like:
+- CORS errors
+- API endpoint not found (404)
+- Data parsing errors
+
+Add this debug code to see what's received:
+
+
+STEP 3: ADD DEBUG LOGGING
+--------------------------
+
+Temporarily modify stock-register.component.ts:
+
+```typescript
+loadStockRegister(): void {
+  this.loading.set(true);
+  this.showSummary.set(false);
+  
+  console.log('🔍 Loading stock register...');
+  
+  this.stockService.getStockRegister({ searchTerm: this.searchTerm || undefined }).subscribe({
+    next: (data) => {
+      console.log('✅ Stock data received:', data);
+      console.log('📊 Number of items:', data.length);
+      console.log('🔎 First item:', data[0]);
+      
+      this.stockItems.set(data);
+      this.filteredItems.set(data);
+      this.loading.set(false);
+      
+      console.log('✅ Stock items signal:', this.stockItems());
+      console.log('✅ Filtered items signal:', this.filteredItems());
+    },
+    error: (error) => {
+      console.error('❌ Error loading stock:', error);
+      console.error('❌ Error details:', error.error);
+      this.toast.error(error.error?.message || 'Failed to load stock register');
+      this.loading.set(false);
+    }
+  });
+}
+```
+
+Reload the page and check console output.
+
+
+STEP 4: FIX BACKEND API RESPONSE FORMAT
+----------------------------------------
+
+The problem is likely in StockRegisterRoutes.cs - it's returning PascalCase instead of camelCase.
+
+CURRENT CODE (WRONG):
+```csharp
+stockList.Add(new
+{
+    stockId = reader.GetInt32(reader.GetOrdinal("StockId")),  // ✅ camelCase
+    productId = reader.GetInt32(reader.GetOrdinal("ProductId")), // ✅ camelCase
+    productName = reader.GetString(reader.GetOrdinal("ProductName")), // ✅ camelCase
+    // ... rest is correct
+});
+```
+
+Actually, your backend code already uses camelCase (correct).
+
+BUT, if you're seeing PascalCase in the Network tab, the issue is:
+- Stored procedure returns column names in PascalCase
+- .NET automatically converts based on column names
+
+FIX: Ensure the backend explicitly uses camelCase property names (already done in your code).
+
+
+STEP 5: CHECK IF DATA IS ACTUALLY EMPTY
+----------------------------------------
+
+Run this SQL query:
+
+```sql
+-- Check what the API should be returning
+EXEC sp_GetStockRegister 
+    @ProductId = NULL,
+    @CategoryId = NULL,
+    @SubCategoryId = NULL,
+    @SearchTerm = NULL;
+```
+
+This shows exactly what the API returns.
+
+If all FilledStock/EmptyStock/DamagedStock are 0, that's normal after initialization.
+The UI should still show rows with 0 values.
+
+
+STEP 6: CHECK ANGULAR MODEL INTERFACE
+--------------------------------------
+
+Open: src/app/models/stock-register.model.ts
+
+Ensure it matches the API response:
+
+```typescript
+export interface StockRegister {
+  stockId: number;
+  productId: number;
+  productName: string;
+  categoryName: string;
+  subCategoryName: string;
+  filledStock: number;
+  emptyStock: number;
+  damagedStock: number;
+  totalStock: number;
+  lastUpdated: Date | string;
+  updatedBy?: string | null;
+}
+```
+
+Properties must be EXACTLY camelCase to match API.
+
+
+STEP 7: VERIFY API URL IS CORRECT
+----------------------------------
+
+Check environment.ts:
+
+```typescript
+export const environment = {
+  production: false,
+  apiUrl: 'https://localhost:7183/api'  // Should NOT have trailing slash
+};
+```
+
+Service constructs URL as:
+```typescript
+private apiUrl = `${environment.apiUrl}/stockregister`;
+// Results in: https://localhost:7183/api/stockregister ✅
+```
+
+
+STEP 8: TEST API DIRECTLY IN BROWSER
+-------------------------------------
+
+Open new browser tab and navigate to:
+```
+https://localhost:7183/api/stockregister
+```
+
+You should see JSON response with stock data.
+
+If you get:
+- Certificate error → Accept the certificate
+- CORS error → Backend CORS not configured for browser direct access (normal)
+- 404 error → Endpoint not registered
+- JSON data → API is working, Angular is the issue
+
+
+MOST LIKELY SOLUTION
+---------------------
+
+Based on your symptoms, the most likely issue is:
+
+**The API is returning data but Angular template is not rendering it.**
+
+Quick Fix - Add this to your component:
+
+```typescript
+// In stock-register.component.ts, after ngOnInit
+ngAfterViewInit() {
+  console.log('View initialized. Items:', this.filteredItems());
+}
+```
+
+And in the template, change:
+```html
+<tr *ngFor="let item of filteredItems(); let i = index; trackBy: trackByStockId">
+```
+
+Add this method:
+```typescript
+trackByStockId(index: number, item: StockRegister): number {
+  return item.stockId;
+}
+```
+
+
+IMMEDIATE ACTION ITEMS
+----------------------
+
+Do these in order:
+
+1. **Open browser DevTools (F12)**
+2. **Go to Network tab**
+3. **Reload Stock Register page**
+4. **Find GET request to /api/stockregister**
+5. **Click on it and check the Response tab**
+6. **Copy the response and share it**
+
+Also:
+
+7. **Open Console tab**
+8. **Look for any red errors**
+9. **Copy any errors and share them**
+
+This will tell us exactly what's happening.
+
+
+QUICK TEST HTML
+---------------
+
+Temporarily add this to stock-register.component.html (at the top):
+
+```html
+<div class="alert alert-info">
+  <strong>Debug Info:</strong><br>
+  Loading: {{ loading() }}<br>
+  Show Summary: {{ showSummary() }}<br>
+  Stock Items Count: {{ stockItems().length }}<br>
+  Filtered Items Count: {{ filteredItems().length }}<br>
+  <details>
+    <summary>Raw Data (first 2 items)</summary>
+    <pre>{{ filteredItems().slice(0, 2) | json }}</pre>
+  </details>
+</div>
+```
+
+This will show you:
+- If data is being received (count > 0)
+- What the data looks like
+- If signals are updating
+
+
+EXPECTED BEHAVIOR
+-----------------
+
+After initialization, you should see:
+- 11 rows in the table (even with 0 stock values)
+- Product names, categories visible
+- All stock values showing 0
+
+The table should NOT be empty - it should show products with zero stock.
+
+If table is completely empty (no rows), the issue is:
+- filteredItems() is empty array
+- Data is not being set in the component
+- API is not returning data
+- There's a JavaScript error preventing rendering
+
+
+SHARE THIS INFORMATION
+----------------------
+
+Please provide:
+
+1. **Network tab screenshot** showing:
+   - Request URL
+   - Status code
+   - Response data (first few lines)
+
+2. **Console tab screenshot** showing any errors
+
+3. **Result of this SQL query:**
+   ```sql
+   SELECT COUNT(*) as TotalRecords FROM StockRegister;
+   SELECT TOP 3 * FROM StockRegister;
+   ```
+
+4. **What you see in the debug alert** (if you added it)
+
+This will help identify the exact problem.

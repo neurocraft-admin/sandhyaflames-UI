@@ -7,6 +7,8 @@ export interface DailyDeliveryItemActual {
   plannedQuantity: number;
   deliveredQuantity: number;
   pendingQuantity: number;
+  emptyReturned: number;
+  damagedReturned: number;
   cashCollected: number;
   itemStatus: 'Completed' | 'Partial' | 'Pending';
   remarks?: string;
@@ -23,6 +25,8 @@ export interface ItemActualInput {
   productId: number;
   delivered: number;
   pending: number;
+  emptyReturned: number;
+  damagedReturned: number;
   cashCollected: number;
   remarks?: string;
 }

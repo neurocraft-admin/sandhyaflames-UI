@@ -32,7 +32,6 @@ export class DailyDeliveryUpdateComponent implements OnInit {
     
     this.form = this.fb.group({
       returnTime: ['', Validators.required],
-      emptyCylindersReturned: [0, [Validators.required, Validators.min(0)]],
       remarks: [''],
       items: this.fb.array([])
     });
@@ -104,6 +103,8 @@ export class DailyDeliveryUpdateComponent implements OnInit {
         plannedQuantity: [item.plannedQuantity],
         deliveredQuantity: [item.deliveredQuantity, [Validators.required, Validators.min(0)]],
         pendingQuantity: [item.pendingQuantity, [Validators.required, Validators.min(0)]],
+        emptyReturned: [item.emptyReturned || 0, [Validators.min(0)]],
+        damagedReturned: [item.damagedReturned || 0, [Validators.min(0)]],
         cashCollected: [item.cashCollected, [Validators.required, Validators.min(0)]],
         remarks: [item.remarks || ''],
         unitPrice: [item.unitPrice]
@@ -173,6 +174,24 @@ export class DailyDeliveryUpdateComponent implements OnInit {
     return total;
   }
 
+  getTotalEmptyReturned(): number {
+    let total = 0;
+    for (let i = 0; i < this.itemsFormArray.length; i++) {
+      const item = this.itemsFormArray.at(i);
+      total += item.get('emptyReturned')?.value || 0;
+    }
+    return total;
+  }
+
+  getTotalDamagedReturned(): number {
+    let total = 0;
+    for (let i = 0; i < this.itemsFormArray.length; i++) {
+      const item = this.itemsFormArray.at(i);
+      total += item.get('damagedReturned')?.value || 0;
+    }
+    return total;
+  }
+
   saveItems(): void {
     if (this.itemsFormArray.invalid) {
       this.toast.error('Please fill all required fields');
@@ -183,6 +202,8 @@ export class DailyDeliveryUpdateComponent implements OnInit {
       productId: control.get('productId')?.value,
       delivered: control.get('deliveredQuantity')?.value,
       pending: control.get('pendingQuantity')?.value,
+      emptyReturned: control.get('emptyReturned')?.value || 0,
+      damagedReturned: control.get('damagedReturned')?.value || 0,
       cashCollected: control.get('cashCollected')?.value,
       remarks: control.get('remarks')?.value || ''
     }));
@@ -208,6 +229,8 @@ export class DailyDeliveryUpdateComponent implements OnInit {
       productId: control.get('productId')?.value,
       delivered: control.get('deliveredQuantity')?.value,
       pending: control.get('pendingQuantity')?.value,
+      emptyReturned: control.get('emptyReturned')?.value || 0,
+      damagedReturned: control.get('damagedReturned')?.value || 0,
       cashCollected: control.get('cashCollected')?.value,
       remarks: control.get('remarks')?.value || ''
     }));
@@ -217,7 +240,7 @@ export class DailyDeliveryUpdateComponent implements OnInit {
         // Then close delivery
         const closeRequest: CloseDeliveryWithItemsRequest = {
           returnTime: this.form.value.returnTime,
-          emptyCylindersReturned: this.form.value.emptyCylindersReturned,
+          emptyCylindersReturned: this.getTotalEmptyReturned(), // Calculate from items
           remarks: this.form.value.remarks
         };
 

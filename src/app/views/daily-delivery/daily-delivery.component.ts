@@ -91,7 +91,6 @@ export class DailyDeliveryComponent {
     productId: [0, Validators.required],
     noOfCylinders: [0],
     noOfInvoices: [1, [Validators.required, Validators.min(1)]],
-    noOfDeliveries: [1, [Validators.required, Validators.min(1)]],
     noOfItems: [0]
   });
 

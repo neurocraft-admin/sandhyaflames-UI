@@ -1,0 +1,341 @@
+=============================================
+STOCK REGISTER INTEGRATION GUIDE
+Connecting Purchase Entry → Daily Delivery → Stock Register
+=============================================
+
+OVERVIEW:
+The stock register needs to automatically update in three scenarios:
+1. Purchase Entry Created → Add filled stock
+2. Daily Delivery Created → Deduct filled stock
+3. Daily Delivery Closed → Add empty/damaged stock back
+
+PREREQUISITES:
+✅ sp_StockRegister.sql executed in database (creates tables & stored procedures)
+✅ StockRegister component created in Angular (UI for viewing)
+✅ Backend API routes need to be created
+
+=============================================
+PART 1: BACKEND API IMPLEMENTATION
+=============================================
+
+FILE: Routes/StockRegisterRoutes.cs (NEW FILE)
+Location: Create in your backend API project's Routes folder
+
+Copy the complete code from: StockRegister_API_Implementation_Prompt.txt
+This creates 8 endpoints including:
+- GET /api/stockregister (view stock)
+- GET /api/stockregister/summary (summary by category)
+- POST /api/stockregister/update-from-purchase (called by Purchase Entry)
+- POST /api/stockregister/update-from-delivery/{deliveryId} (called by Daily Delivery creation)
+- POST /api/stockregister/update-from-return/{deliveryId} (called by Daily Delivery closure)
+
+REGISTRATION:
+In your Program.cs or startup file, add:
+app.MapStockRegisterRoutes();
+
+=============================================
+PART 2: INTEGRATION POINTS
+=============================================
+
+A) PURCHASE ENTRY → STOCK REGISTER
+-----------------------------------
+When: After purchase entry is saved successfully
+Where: PurchaseEntryRoutes.cs → POST /api/purchaseentry endpoint
+Action: Call sp_UpdateStockFromPurchase
+
+CURRENT CODE (PurchaseEntryRoutes.cs):
+```csharp
+app.MapPost("/api/purchaseentry", async ([FromBody] PurchaseEntryRequest request, IConfiguration config) =>
+{
+    // ... existing purchase entry save logic ...
+    
+    // After successful save, get the PurchaseId
+    int purchaseId = /* get from return */;
+    
+    // Return success
+    return Results.Ok(new { success = true, purchaseId });
+});
+```
+
+MODIFIED CODE (Add stock update):
+```csharp
+app.MapPost("/api/purchaseentry", async ([FromBody] PurchaseEntryRequest request, IConfiguration config) =>
+{
+    // ... existing purchase entry save logic ...
+    int purchaseId = /* get from return */;
+    
+    // 🔥 NEW: Update stock register for each purchased item
+    foreach (var item in request.Items)
+    {
+        try
+        {
+            using var stockConn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+            using var stockCmd = new SqlCommand("sp_UpdateStockFromPurchase", stockConn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+            
+            stockCmd.Parameters.AddWithValue("@PurchaseId", purchaseId);
+            stockCmd.Parameters.AddWithValue("@ProductId", item.ProductId);
+            stockCmd.Parameters.AddWithValue("@Quantity", item.Quantity);
+            stockCmd.Parameters.AddWithValue("@Remarks", $"Purchase Entry #{purchaseId}");
+            
+            await stockConn.OpenAsync();
+            await stockCmd.ExecuteNonQueryAsync();
+            
+            Console.WriteLine($"Stock updated: Product {item.ProductId}, Qty {item.Quantity}");
+        }
+        catch (Exception stockEx)
+        {
+            Console.WriteLine($"Stock update failed for Product {item.ProductId}: {stockEx.Message}");
+            // Continue processing - don't fail entire purchase if stock update fails
+        }
+    }
+    
+    return Results.Ok(new { success = true, purchaseId });
+});
+```
+
+B) DAILY DELIVERY CREATION → STOCK REGISTER
+--------------------------------------------
+When: After daily delivery is created and items are assigned
+Where: DailyDeliveryRoutes.cs → POST /api/dailydelivery endpoint
+Action: Call sp_UpdateStockFromDeliveryAssignment
+
+CURRENT CODE (DailyDeliveryRoutes.cs):
+```csharp
+app.MapPost("/api/dailydelivery", async ([FromBody] DeliveryRequest request, IConfiguration config) =>
+{
+    // ... existing delivery creation logic ...
+    
+    int deliveryId = /* get from return */;
+    
+    return Results.Ok(new { success = true, deliveryId });
+});
+```
+
+MODIFIED CODE (Add stock deduction):
+```csharp
+app.MapPost("/api/dailydelivery", async ([FromBody] DeliveryRequest request, IConfiguration config) =>
+{
+    // ... existing delivery creation logic ...
+    int deliveryId = /* get from return */;
+    
+    // 🔥 NEW: Deduct stock when delivery is created
+    try
+    {
+        using var stockConn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+        using var stockCmd = new SqlCommand("sp_UpdateStockFromDeliveryAssignment", stockConn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        
+        stockCmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+        
+        await stockConn.OpenAsync();
+        using var reader = await stockCmd.ExecuteReaderAsync();
+        
+        if (await reader.ReadAsync())
+        {
+            var success = reader.GetInt32(reader.GetOrdinal("success"));
+            var message = reader.GetString(reader.GetOrdinal("message"));
+            Console.WriteLine($"Stock deduction: {message}");
+        }
+    }
+    catch (Exception stockEx)
+    {
+        Console.WriteLine($"Stock deduction failed for Delivery {deliveryId}: {stockEx.Message}");
+        // Don't fail delivery creation if stock update fails
+    }
+    
+    return Results.Ok(new { success = true, deliveryId });
+});
+```
+
+C) DAILY DELIVERY CLOSURE → STOCK REGISTER
+-------------------------------------------
+When: When delivery is marked as completed/closed
+Where: DailyDeliveryRoutes.cs → POST /api/dailydelivery/close/{id} endpoint
+Action: Call sp_UpdateStockFromDeliveryReturn
+
+CURRENT CODE:
+```csharp
+app.MapPost("/api/dailydelivery/close/{id}", async (int id, IConfiguration config) =>
+{
+    // ... existing delivery closure logic ...
+    
+    return Results.Ok(new { success = true });
+});
+```
+
+MODIFIED CODE (Add empty/damaged return):
+```csharp
+app.MapPost("/api/dailydelivery/close/{id}", async (
+    int id, 
+    [FromBody] DeliveryCloseRequest request,  // Should include emptyCylinders, damagedCylinders
+    IConfiguration config) =>
+{
+    // ... existing delivery closure logic ...
+    
+    // 🔥 NEW: Update stock with returned cylinders
+    try
+    {
+        using var stockConn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+        using var stockCmd = new SqlCommand("sp_UpdateStockFromDeliveryReturn", stockConn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        
+        stockCmd.Parameters.AddWithValue("@DeliveryId", id);
+        stockCmd.Parameters.AddWithValue("@EmptyCylindersReturned", request.EmptyCylindersReturned ?? 0);
+        stockCmd.Parameters.AddWithValue("@DamagedCylinders", request.DamagedCylinders ?? 0);
+        
+        await stockConn.OpenAsync();
+        using var reader = await stockCmd.ExecuteReaderAsync();
+        
+        if (await reader.ReadAsync())
+        {
+            var success = reader.GetInt32(reader.GetOrdinal("success"));
+            var message = reader.GetString(reader.GetOrdinal("message"));
+            Console.WriteLine($"Stock return: {message}");
+        }
+    }
+    catch (Exception stockEx)
+    {
+        Console.WriteLine($"Stock return failed for Delivery {id}: {stockEx.Message}");
+    }
+    
+    return Results.Ok(new { success = true });
+});
+```
+
+=============================================
+PART 3: TESTING WORKFLOW
+=============================================
+
+STEP 1: Initialize Stock (One-time)
+POST /api/stockregister/initialize
+→ Creates stock records for all products with 0 quantities
+
+STEP 2: Test Purchase Entry → Stock
+1. Create a purchase entry with:
+   - Product: 19kg HP Cylinder
+   - Quantity: 100
+2. Check Stock Register:
+   - FilledStock should increase by 100
+3. Check StockTransactions table:
+   - Should have entry: TransactionType = 'Purchase', FilledChange = +100
+
+STEP 3: Test Daily Delivery → Stock Deduction
+1. Create a daily delivery with:
+   - Product: 19kg HP Cylinder
+   - Quantity: 20
+2. Check Stock Register:
+   - FilledStock should decrease by 20 (now 80)
+3. Check StockTransactions:
+   - Should have entry: TransactionType = 'DeliveryAssigned', FilledChange = -20
+
+STEP 4: Test Delivery Closure → Empty Return
+1. Close the delivery with:
+   - EmptyCylindersReturned: 18
+   - DamagedCylinders: 2
+2. Check Stock Register:
+   - EmptyStock should increase by 18
+   - DamagedStock should increase by 2
+3. Check StockTransactions:
+   - Should have entry: TransactionType = 'DeliveryCompleted', EmptyChange = +18, DamagedChange = +2
+
+EXPECTED FINAL STATE:
+Product: 19kg HP Cylinder
+- FilledStock: 80 (100 purchased - 20 delivered)
+- EmptyStock: 18 (returned)
+- DamagedStock: 2 (damaged)
+- TotalStock: 100 (balanced)
+
+=============================================
+PART 4: DATABASE VERIFICATION QUERIES
+=============================================
+
+-- View all stock levels
+SELECT 
+    p.ProductName,
+    sr.FilledStock,
+    sr.EmptyStock,
+    sr.DamagedStock,
+    (sr.FilledStock + sr.EmptyStock + sr.DamagedStock) AS TotalStock
+FROM StockRegister sr
+INNER JOIN Products p ON sr.ProductId = p.ProductId
+ORDER BY p.ProductName;
+
+-- View all stock transactions
+SELECT 
+    st.TransactionId,
+    p.ProductName,
+    st.TransactionType,
+    st.FilledChange,
+    st.EmptyChange,
+    st.DamagedChange,
+    st.ReferenceId,
+    st.ReferenceType,
+    st.Remarks,
+    st.TransactionDate
+FROM StockTransactions st
+INNER JOIN Products p ON st.ProductId = p.ProductId
+ORDER BY st.TransactionDate DESC;
+
+-- Check stock for specific product
+EXEC sp_GetStockRegister @ProductId = 1;
+
+-- View stock summary by category
+EXEC sp_GetStockSummary;
+
+=============================================
+PART 5: TROUBLESHOOTING
+=============================================
+
+ISSUE: Stock not updating after purchase entry
+FIX: 
+1. Check if sp_UpdateStockFromPurchase exists in database
+2. Verify connection string in config
+3. Check console logs for errors
+4. Ensure Products table has ProductId matching purchase items
+
+ISSUE: Negative stock after delivery
+FIX:
+1. Stock was not initialized - run POST /api/stockregister/initialize
+2. Or add manual adjustment: POST /api/stockregister/adjust
+
+ISSUE: Stock doesn't show in UI
+FIX:
+1. Ensure tables are created (run sp_StockRegister.sql)
+2. Check Angular service is calling correct endpoint
+3. Verify CORS settings allow API calls
+
+ISSUE: Duplicate stock entries
+FIX:
+1. StockRegister table has UNIQUE constraint on ProductId
+2. Should not happen - check if constraint exists:
+   SELECT * FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS 
+   WHERE TABLE_NAME = 'StockRegister' AND CONSTRAINT_TYPE = 'UNIQUE';
+
+=============================================
+QUICK START CHECKLIST
+=============================================
+
+Backend Setup:
+[ ] 1. Execute sp_StockRegister.sql in SQL Server Management Studio
+[ ] 2. Create StockRegisterRoutes.cs from prompt file
+[ ] 3. Add app.MapStockRegisterRoutes() in Program.cs
+[ ] 4. Update PurchaseEntryRoutes.cs with stock update code
+[ ] 5. Update DailyDeliveryRoutes.cs with stock deduction code
+[ ] 6. Update DailyDeliveryRoutes.cs with stock return code
+[ ] 7. Rebuild and restart backend API
+
+Testing:
+[ ] 8. POST /api/stockregister/initialize (one-time setup)
+[ ] 9. Create a purchase entry → verify stock increases
+[ ] 10. Create a delivery → verify stock decreases
+[ ] 11. Close delivery with returns → verify empty/damaged increases
+[ ] 12. View Stock Register page in UI → verify all data displays
+
+Done! Stock integration should now be working end-to-end.

@@ -51,6 +51,8 @@
                 <th>Planned</th>
                 <th>Delivered</th>
                 <th>Pending</th>
+                <th>Empty Returned</th>
+                <th>Damaged</th>
                 <th>Unit Price</th>
                 <th>Cash Collected</th>
                 <th>Status</th>
@@ -90,6 +92,26 @@
                   </span>
                 </td>
                 
+                <!-- Empty Returned (editable) -->
+                <td>
+                  <input type="number" 
+                         class="form-control form-control-sm" 
+                         formControlName="emptyReturned"
+                         min="0"
+                         placeholder="0">
+                  <small class="text-muted">Old empties</small>
+                </td>
+                
+                <!-- Damaged Returned (editable) -->
+                <td>
+                  <input type="number" 
+                         class="form-control form-control-sm" 
+                         formControlName="damagedReturned"
+                         min="0"
+                         placeholder="0">
+                  <small class="text-muted">Damaged</small>
+                </td>
+                
                 <!-- Unit Price (readonly) -->
                 <td class="text-end">
                   {{ item.get('unitPrice')?.value | currency:'INR' }}
@@ -125,7 +147,7 @@
               
               <!-- Empty State -->
               <tr *ngIf="itemsFormArray.length === 0">
-                <td colspan="9" class="text-center text-muted">
+                <td colspan="11" class="text-center text-muted">
                   No items found for this delivery
                 </td>
               </tr>
@@ -137,6 +159,8 @@
                 <th colspan="3" class="text-end">Totals:</th>
                 <th class="text-center">{{ getTotalDelivered() }}</th>
                 <th class="text-center">{{ getTotalPending() }}</th>
+                <th class="text-center">{{ getTotalEmptyReturned() }}</th>
+                <th class="text-center">{{ getTotalDamagedReturned() }}</th>
                 <th></th>
                 <th class="text-end">{{ getTotalCashCollected() | currency:'INR' }}</th>
                 <th colspan="2"></th>
@@ -147,17 +171,12 @@
 
         <!-- Delivery Closure Section -->
         <div class="row g-3 mb-3">
-          <div class="col-md-4">
+          <div class="col-md-6">
             <label class="form-label">Return Time <span class="text-danger">*</span></label>
             <input type="time" class="form-control" formControlName="returnTime">
           </div>
           
-          <div class="col-md-4">
-            <label class="form-label">Empty Cylinders Returned</label>
-            <input type="number" class="form-control" formControlName="emptyCylindersReturned" min="0">
-          </div>
-          
-          <div class="col-md-4">
+          <div class="col-md-6">
             <label class="form-label">Overall Remarks</label>
             <input type="text" class="form-control" formControlName="remarks" placeholder="Optional">
           </div>

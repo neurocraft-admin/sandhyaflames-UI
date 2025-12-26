@@ -40,7 +40,7 @@ import { NgFor, NgIf  } from '@angular/common';
 })
 export class DefaultLayoutComponent {
   public toastService = inject(ToastService);
-  // ✅ Hard-coded menu for beta release
+  // ✅ Menu organized by sections
   public sidebarItems: INavData[] = [
     {
       name: 'Dashboard',
@@ -48,75 +48,110 @@ export class DefaultLayoutComponent {
       iconComponent: { name: 'cil-speedometer' }
     },
     {
-      name: 'Users',
-      url: '/users',
-      iconComponent: { name: 'cil-user' }
-    },
-    {
-      name: 'Roles',
-      url: '/roles',
-      iconComponent: { name: 'cil-shield-alt' }
-    },
-    {
-      name: 'Products',
-      url: '/products',
-      iconComponent: { name: 'cil-layers' }
-    },
-    {
-      name: 'Customers',
-      url: '/customers',
-      iconComponent: { name: 'cil-people' }
-    },
-    {
-      name: 'Customer Credit',
-      url: '/customer-credit',
-      iconComponent: { name: 'cil-credit-card' }
-    },
-    {
-      name: 'Drivers',
-      url: '/drivers',
-      iconComponent: { name: 'cil-user-follow' }
-    },
-    {
-      name: 'Vehicles',
-      url: '/vehicles',
-      iconComponent: { name: 'cil-truck' }
-    },
-    {
-      name: 'Vehicle Assignment',
-      url: '/vehicle-assignment',
-      iconComponent: { name: 'cil-transfer' }
-    },
-    {
-      name: 'Purchase Entry',
-      url: '/PurchaseEntry',
-      iconComponent: { name: 'cil-cart' }
-    },
-    {
-      name: 'Product Pricing',
-      url: '/ProductPricing',
-      iconComponent: { name: 'cil-dollar' }
-    },
-    {
-      name: 'Daily Delivery',
-      iconComponent: { name: 'cil-bullhorn' },
+      name: 'Admin',
+      iconComponent: { name: 'cil-shield-alt' },
       children: [
         {
-          name: 'All Deliveries',
-          url: '/DailyDelivery'
+          name: 'Users',
+          url: '/users',
+          iconComponent: { name: 'cil-user' }
         },
         {
-          name: 'Commercial Deliveries',
-          url: '/CommercialDeliveries'
+          name: 'Roles',
+          url: '/roles',
+          iconComponent: { name: 'cil-people' }
         }
       ]
     },
     {
-      name: 'Income & Expense',
+      name: 'Delivery',
+      iconComponent: { name: 'cil-truck' },
+      children: [
+        {
+          name: 'Daily Delivery',
+          url: '/DailyDelivery',
+          iconComponent: { name: 'cil-calendar' }
+        },
+        {
+          name: 'Delivery Mapping',
+          url: '/DeliveryMapping',
+          iconComponent: { name: 'cil-map' }
+        },
+        {
+          name: 'Commercial Deliveries',
+          url: '/CommercialDeliveries',
+          iconComponent: { name: 'cil-briefcase' }
+        }
+      ]
+    },
+    {
+      name: 'Purchase & Stocks',
+      iconComponent: { name: 'cil-basket' },
+      children: [
+        {
+          name: 'Purchase Entry',
+          url: '/PurchaseEntry',
+          iconComponent: { name: 'cil-cart' }
+        },
+        {
+          name: 'Stock Register',
+          url: '/StockRegister',
+          iconComponent: { name: 'cil-storage' }
+        }
+      ]
+    },
+    {
+      name: 'Income/Expense',
       url: '/IncomeExpenseForm',
-      iconComponent: { name: 'cil-wallet' }
+      iconComponent: { name: 'cil-money' }
+    },
+    {
+      name: 'Masters',
+      iconComponent: { name: 'cil-settings' },
+      children: [
+        {
+          name: 'Drivers',
+          url: '/drivers',
+          iconComponent: { name: 'cil-user-follow' }
+        },
+        {
+          name: 'Vehicles',
+          url: '/vehicles',
+          iconComponent: { name: 'cil-car-alt' }
+        },
+        {
+          name: 'Vehicle Assignment',
+          url: '/vehicle-assignment',
+          iconComponent: { name: 'cil-transfer' }
+        },
+        {
+          name: 'Products',
+          url: '/products',
+          iconComponent: { name: 'cil-library' }
+        },
+        {
+          name: 'Product Pricing',
+          url: '/ProductPricing',
+          iconComponent: { name: 'cil-dollar' }
+        }
+      ]
+    },
+    {
+      name: 'Customer',
+      iconComponent: { name: 'cil-people' },
+      children: [
+        {
+          name: 'Customers',
+          url: '/customers',
+          iconComponent: { name: 'cil-user' }
+        },
+        {
+          name: 'Customer Credit',
+          url: '/customer-credit',
+          iconComponent: { name: 'cil-credit-card' }
+        }
+      ]
     }
-
   ];
 
   logout() {

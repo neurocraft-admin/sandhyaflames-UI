@@ -6,6 +6,7 @@ import { PurchaseEntry, PurchaseEntryItem } from '../../models/purchase-entry.mo
 import { ToastService } from '../../services/toast.service';
 import { ProductDropdownService, ProductOption } from '../../services/product-dropdown.service';
 import { VendorDropdownService, VendorOption } from '../../services/vendor-dropdown.service';
+import { ProductPricingService } from '../../services/product-pricing.service';
 
 @Component({
   selector: 'app-purchase-entry-list',
@@ -19,6 +20,7 @@ export class PurchaseEntryListComponent {
   private toast = inject(ToastService);
   private productSvc = inject(ProductDropdownService);
   private vendorSvc = inject(VendorDropdownService);
+  private pricingSvc = inject(ProductPricingService);
 
   rows: PurchaseEntry[] = [];
   products: ProductOption[] = [];
@@ -173,17 +175,36 @@ export class PurchaseEntryListComponent {
     const grp = this.items.at(ix);
     const productId = Number(grp.get('productId')?.value);
     const p = this.products.find(x => x.productId === productId);
+    
     // Auto-fill category/subcategory IDs from selected product
     grp.get('categoryId')?.setValue(p?.categoryId ?? 0);
     grp.get('subCategoryId')?.setValue(p?.subCategoryId ?? 0);
-    // (Optional) You could also default unitPrice from pricing module here later.
+    
+    // Fetch unit price from Product Pricing module
+    if (productId > 0) {
+      this.pricingSvc.getHistory(productId).subscribe({
+        next: (pricing: any) => {
+          if (pricing && pricing.length > 0) {
+            // Use the most recent pricing record (first in history)
+            grp.get('unitPrice')?.setValue(pricing[0].sellingPrice || pricing[0].SellingPrice || 0);
+          } else {
+            grp.get('unitPrice')?.setValue(0);
+            this.toast.warning(`No pricing found for this product`);
+          }
+        },
+        error: () => {
+          grp.get('unitPrice')?.setValue(0);
+          this.toast.error('Failed to fetch product price');
+        }
+      });
+    }
   }
 
   getCategoryNameForRow(ix: number): string {
     const pid = Number(this.items.at(ix).get('productId')?.value);
     const p = this.products.find(x => x.productId === pid);
     return p?.categoryName ?? '';
-    }
+  }
 
   getSubCategoryNameForRow(ix: number): string {
     const pid = Number(this.items.at(ix).get('productId')?.value);
@@ -197,7 +218,7 @@ export class PurchaseEntryListComponent {
       categoryId: [it?.categoryId ?? 0, Validators.required],        // hidden, auto-filled
       subCategoryId: [it?.subCategoryId ?? 0, Validators.required],  // hidden, auto-filled
       qty: [it?.qty ?? 1, [Validators.required, Validators.min(1)]],
-      unitPrice: [it?.unitPrice ?? 0, [Validators.required, Validators.min(0)]],
+      unitPrice: [{ value: it?.unitPrice ?? 0, disabled: true }],    // Auto-filled from pricing, read-only
     });
   }
 
