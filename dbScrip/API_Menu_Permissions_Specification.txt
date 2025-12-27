@@ -1,0 +1,414 @@
+=============================================
+API ENDPOINTS SPECIFICATION
+Menu and Permissions System
+Backend: .NET Core Minimal API
+=============================================
+
+BASE URL: https://localhost:7183/api
+
+=============================================
+ENDPOINT 1: Get Menu for Current User
+=============================================
+
+URL: GET /api/menu/current-user
+Authentication: Required (JWT Bearer Token)
+Authorization: Any authenticated user
+
+DESCRIPTION:
+Returns hierarchical menu items based on logged-in user's role.
+
+C# IMPLEMENTATION:
+------------------
+app.MapGet("/api/menu/current-user", async (HttpContext context, SqlConnection db) =>
+{
+    var userId = context.User.FindFirst("UserId")?.Value;
+    if (string.IsNullOrEmpty(userId))
+        return Results.Unauthorized();
+    
+    // Get user's roleId
+    var roleId = await db.QueryFirstOrDefaultAsync<int>(
+        "SELECT RoleId FROM Users WHERE UserId = @UserId",
+        new { UserId = int.Parse(userId) }
+    );
+    
+    // Get menu hierarchy
+    var menuItems = await db.QueryAsync<MenuItemDto>(
+        "EXEC sp_GetMenuByRole @RoleId",
+        new { RoleId = roleId }
+    );
+    
+    // Build hierarchical structure
+    var hierarchy = BuildMenuHierarchy(menuItems);
+    
+    return Results.Ok(hierarchy);
+})
+.RequireAuthorization();
+
+HELPER METHOD:
+--------------
+private static List<INavData> BuildMenuHierarchy(IEnumerable<MenuItemDto> items)
+{
+    var lookup = items.ToLookup(x => x.ParentMenuId);
+    
+    List<INavData> BuildChildren(int? parentId)
+    {
+        return lookup[parentId]
+            .OrderBy(x => x.SortOrder)
+            .Select(item => new INavData
+            {
+                name = item.DisplayName,
+                url = item.Url,
+                iconComponent = new { name = item.Icon },
+                children = item.Url == null ? BuildChildren(item.MenuId) : null
+            })
+            .ToList();
+    }
+    
+    return BuildChildren(null);
+}
+
+RESPONSE EXAMPLE:
+-----------------
+[
+  {
+    "name": "Dashboard",
+    "url": "/dashboard",
+    "iconComponent": { "name": "cil-speedometer" }
+  },
+  {
+    "name": "Admin",
+    "iconComponent": { "name": "cil-shield-alt" },
+    "children": [
+      {
+        "name": "Users",
+        "url": "/users",
+        "iconComponent": { "name": "cil-user" }
+      },
+      {
+        "name": "Roles",
+        "url": "/roles",
+        "iconComponent": { "name": "cil-people" }
+      }
+    ]
+  }
+]
+
+=============================================
+ENDPOINT 2: Get Permissions for Current User
+=============================================
+
+URL: GET /api/permissions/current-user
+Authentication: Required (JWT Bearer Token)
+Authorization: Any authenticated user
+
+DESCRIPTION:
+Returns all resource permissions for the logged-in user's role.
+
+C# IMPLEMENTATION:
+------------------
+app.MapGet("/api/permissions/current-user", async (HttpContext context, SqlConnection db) =>
+{
+    var userId = context.User.FindFirst("UserId")?.Value;
+    if (string.IsNullOrEmpty(userId))
+        return Results.Unauthorized();
+    
+    using var multi = await db.QueryMultipleAsync(
+        "EXEC sp_GetPermissionsByUserId @UserId",
+        new { UserId = int.Parse(userId) }
+    );
+    
+    var userInfo = await multi.ReadFirstAsync<UserInfo>();
+    var permissions = await multi.ReadAsync<ResourcePermission>();
+    
+    return Results.Ok(new
+    {
+        userId = userInfo.userId,
+        username = userInfo.username,
+        roleId = userInfo.roleId,
+        roleName = userInfo.roleName,
+        permissions = permissions
+    });
+})
+.RequireAuthorization();
+
+RESPONSE EXAMPLE:
+-----------------
+{
+  "userId": 1,
+  "username": "admin",
+  "roleId": 1,
+  "roleName": "Administrator",
+  "permissions": [
+    {
+      "resource": "Dashboard",
+      "canView": true,
+      "canCreate": false,
+      "canUpdate": false,
+      "canDelete": false,
+      "canExport": false,
+      "canApprove": false
+    },
+    {
+      "resource": "Users",
+      "canView": true,
+      "canCreate": true,
+      "canUpdate": true,
+      "canDelete": true,
+      "canExport": true,
+      "canApprove": false
+    },
+    {
+      "resource": "Products",
+      "canView": true,
+      "canCreate": true,
+      "canUpdate": true,
+      "canDelete": false,
+      "canExport": true,
+      "canApprove": false
+    }
+  ]
+}
+
+=============================================
+ENDPOINT 3: Check Specific Permission
+=============================================
+
+URL: GET /api/permissions/check
+Authentication: Required (JWT Bearer Token)
+Authorization: Any authenticated user
+
+QUERY PARAMETERS:
+- resource: string (e.g., "Products", "Users")
+- action: string (e.g., "View", "Create", "Update", "Delete")
+
+DESCRIPTION:
+Checks if current user has specific permission for a resource.
+
+C# IMPLEMENTATION:
+------------------
+app.MapGet("/api/permissions/check", async (
+    HttpContext context, 
+    SqlConnection db,
+    [FromQuery] string resource,
+    [FromQuery] string action) =>
+{
+    var userId = context.User.FindFirst("UserId")?.Value;
+    if (string.IsNullOrEmpty(userId))
+        return Results.Unauthorized();
+    
+    var result = await db.QueryFirstOrDefaultAsync<PermissionCheckResult>(
+        "EXEC sp_CheckPermission @UserId, @ResourceName, @Action",
+        new { UserId = int.Parse(userId), ResourceName = resource, Action = action }
+    );
+    
+    return Results.Ok(new { allowed = result?.allowed ?? false });
+})
+.RequireAuthorization();
+
+RESPONSE EXAMPLE:
+-----------------
+{
+  "allowed": true
+}
+
+=============================================
+ENDPOINT 4: Update Role Permissions (Admin Only)
+=============================================
+
+URL: PUT /api/permissions/role/{roleId}
+Authentication: Required (JWT Bearer Token)
+Authorization: Admin role only
+
+REQUEST BODY:
+-------------
+{
+  "resourceId": 13,
+  "canView": true,
+  "canCreate": true,
+  "canUpdate": true,
+  "canDelete": false,
+  "canExport": true,
+  "canApprove": false
+}
+
+C# IMPLEMENTATION:
+------------------
+app.MapPut("/api/permissions/role/{roleId}", async (
+    int roleId,
+    [FromBody] UpdatePermissionRequest request,
+    SqlConnection db) =>
+{
+    var result = await db.QueryFirstOrDefaultAsync<dynamic>(
+        "EXEC sp_UpdateRolePermissions @RoleId, @ResourceId, @CanView, @CanCreate, @CanUpdate, @CanDelete, @CanExport, @CanApprove",
+        new
+        {
+            RoleId = roleId,
+            ResourceId = request.resourceId,
+            CanView = request.canView,
+            CanCreate = request.canCreate,
+            CanUpdate = request.canUpdate,
+            CanDelete = request.canDelete,
+            CanExport = request.canExport,
+            CanApprove = request.canApprove
+        }
+    );
+    
+    return result.success == 1 
+        ? Results.Ok(new { success = true, message = result.message })
+        : Results.BadRequest(new { success = false, message = result.message });
+})
+.RequireAuthorization("AdminOnly");
+
+RESPONSE:
+---------
+{
+  "success": true,
+  "message": "Permissions updated successfully"
+}
+
+=============================================
+ENDPOINT 5: Get All Roles with Permissions
+=============================================
+
+URL: GET /api/roles/permissions
+Authentication: Required (JWT Bearer Token)
+Authorization: Admin role only
+
+DESCRIPTION:
+Returns all roles with permission summary counts.
+
+C# IMPLEMENTATION:
+------------------
+app.MapGet("/api/roles/permissions", async (SqlConnection db) =>
+{
+    var roles = await db.QueryAsync<RolePermissionSummary>(
+        "EXEC sp_GetRolesWithPermissions"
+    );
+    
+    return Results.Ok(roles);
+})
+.RequireAuthorization("AdminOnly");
+
+RESPONSE EXAMPLE:
+-----------------
+[
+  {
+    "roleId": 1,
+    "roleName": "Administrator",
+    "description": "Full system access",
+    "resourceCount": 16,
+    "viewCount": 16,
+    "createCount": 16,
+    "updateCount": 16,
+    "deleteCount": 16
+  },
+  {
+    "roleId": 2,
+    "roleName": "Manager",
+    "description": "Manager access",
+    "resourceCount": 12,
+    "viewCount": 12,
+    "createCount": 8,
+    "updateCount": 8,
+    "deleteCount": 0
+  }
+]
+
+=============================================
+DTO CLASSES
+=============================================
+
+public record MenuItemDto(
+    int MenuId,
+    string Name,
+    string DisplayName,
+    string? Url,
+    string? Icon,
+    int? ParentMenuId,
+    int? ResourceId,
+    int SortOrder,
+    int Level
+);
+
+public record ResourcePermission(
+    string resource,
+    bool canView,
+    bool canCreate,
+    bool canUpdate,
+    bool canDelete,
+    bool canExport,
+    bool canApprove
+);
+
+public record UserInfo(
+    int userId,
+    string username,
+    int roleId,
+    string roleName
+);
+
+public record UpdatePermissionRequest(
+    int resourceId,
+    bool canView,
+    bool canCreate,
+    bool canUpdate,
+    bool canDelete,
+    bool canExport,
+    bool canApprove
+);
+
+public record PermissionCheckResult(bool allowed);
+
+public record RolePermissionSummary(
+    int RoleId,
+    string RoleName,
+    string Description,
+    int ResourceCount,
+    int ViewCount,
+    int CreateCount,
+    int UpdateCount,
+    int DeleteCount
+);
+
+=============================================
+SECURITY NOTES
+=============================================
+
+1. ALL endpoints require authentication (JWT Bearer token)
+2. Admin-only endpoints check role claim in JWT
+3. Permission checks happen on EVERY API call (not just frontend)
+4. Use [Authorize] attribute or .RequireAuthorization()
+5. Store JWT claims: UserId, RoleId, Username
+6. Validate permissions in middleware before executing actions
+
+EXAMPLE MIDDLEWARE:
+-------------------
+public class PermissionMiddleware
+{
+    public async Task InvokeAsync(HttpContext context)
+    {
+        var endpoint = context.GetEndpoint();
+        var requiredPermission = endpoint?.Metadata
+            .GetMetadata<RequirePermissionAttribute>();
+        
+        if (requiredPermission != null)
+        {
+            var userId = context.User.FindFirst("UserId")?.Value;
+            var hasPermission = await CheckPermission(
+                userId, 
+                requiredPermission.Resource, 
+                requiredPermission.Action
+            );
+            
+            if (!hasPermission)
+                context.Response.StatusCode = 403; // Forbidden
+        }
+        
+        await _next(context);
+    }
+}
+
+USAGE:
+------
+[RequirePermission("Products", "Create")]
+app.MapPost("/api/products", CreateProduct);

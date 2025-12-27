@@ -1,8 +1,61 @@
 <div class="container mt-4">
-  <h4>Users</h4>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>Users</h4>
+    <button class="btn btn-success" (click)="addUser()" *ngIf="!showForm">
+      <i class="cil-plus"></i> Add User
+    </button>
+  </div>
 
   <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
 
+  <!-- User Form -->
+  <div class="card mb-4" *ngIf="showForm">
+    <div class="card-header">
+      <h5>{{ isEditing ? 'Edit User' : 'Add New User' }}</h5>
+    </div>
+    <div class="card-body">
+      <form [formGroup]="userForm" (ngSubmit)="saveUser()">
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Full Name *</label>
+            <input type="text" class="form-control" formControlName="fullName" />
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Email *</label>
+            <input type="email" class="form-control" formControlName="email" />
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Password {{ isEditing ? '(leave empty to keep current)' : '*' }}</label>
+            <input type="password" class="form-control" formControlName="password" />
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Role *</label>
+            <select class="form-control" formControlName="roleId">
+              <option [value]="1">Administrator</option>
+              <option [value]="2">Manager</option>
+              <option [value]="3">Operator</option>
+              <option [value]="4">Viewer</option>
+            </select>
+          </div>
+          <div class="col-md-6 mb-3" *ngIf="isEditing">
+            <label class="form-label">Status</label>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" formControlName="isActive" />
+              <label class="form-check-label">Active</label>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary" [disabled]="userForm.invalid">
+            {{ isEditing ? 'Update' : 'Create' }}
+          </button>
+          <button type="button" class="btn btn-secondary" (click)="cancelForm()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Users Table -->
   <table class="table table-striped table-bordered mt-3">
     <thead class="table-light">
       <tr>
@@ -25,7 +78,7 @@
           <span class="badge bg-danger" *ngIf="!u.isActive">Inactive</span>
         </td>
         <td>
-          <button class="btn btn-sm btn-primary me-2">Edit</button>
+          <button class="btn btn-sm btn-primary me-2" (click)="editUser(u)">Edit</button>
           <button class="btn btn-sm btn-danger" (click)="deleteUser(u.userId)">Delete</button>
         </td>
       </tr>

@@ -23,12 +23,27 @@ export class UserService {
     return this.http.get<User[]>(`${this.apiUrl}/list`);
   }
 
-  createUser(user: Partial<User>): Observable<any> {
-    return this.http.post(`${this.apiUrl}/create`, user);
+  createUser(user: any): Observable<any> {
+    // Map password to passwordHash for backend DTO
+    const dto = {
+      fullName: user.fullName,
+      email: user.email,
+      passwordHash: user.password,  // Backend expects passwordHash, not password
+      roleId: user.roleId
+    };
+    return this.http.post(`${this.apiUrl}/create`, dto);
   }
 
-  updateUser(user: Partial<User>): Observable<any> {
-    return this.http.put(`${this.apiUrl}/update`, user);
+  updateUser(user: any): Observable<any> {
+    // Map to backend DTO structure
+    const dto = {
+      userId: user.userId,
+      fullName: user.fullName,
+      email: user.email,
+      roleId: user.roleId,
+      isActive: user.isActive
+    };
+    return this.http.put(`${this.apiUrl}/update`, dto);
   }
 
   deleteUser(userId: number): Observable<any> {

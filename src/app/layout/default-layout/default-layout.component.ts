@@ -1,4 +1,4 @@
-import { Component,inject } from '@angular/core';
+import { Component,inject, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import {
   SidebarComponent,
@@ -15,7 +15,10 @@ import {
   ToastBodyComponent
 } from '@coreui/angular';
 import { ToastService } from '../../services/toast.service';
-import { NgFor, NgIf  } from '@angular/common';
+import { MenuService } from '../../services/menu.service';
+import { AppInitService } from '../../services/app-init.service';
+import { NgFor, NgIf, AsyncPipe  } from '@angular/common';
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-default-layout',
@@ -32,16 +35,23 @@ import { NgFor, NgIf  } from '@angular/common';
     ToastHeaderComponent,
     ToastBodyComponent,
     NgFor,
-    NgIf
+    NgIf,
+    AsyncPipe
   ],
   providers: [SidebarNavHelper],   // ✅ fix NG0201
   templateUrl: './default-layout.component.html',
   styleUrls: ['./default-layout.component.scss']
 })
-export class DefaultLayoutComponent {
+export class DefaultLayoutComponent implements OnInit {
   public toastService = inject(ToastService);
-  // ✅ Menu organized by sections
-  public sidebarItems: INavData[] = [
+  private menuService = inject(MenuService);
+  private appInitService = inject(AppInitService);
+  
+  // Observable for menu items (will be loaded from API)
+  public sidebarItems$: Observable<INavData[]>;
+  
+  // Temporary fallback menu (will be replaced by API data)
+  private fallbackMenu: INavData[] = [
     {
       name: 'Dashboard',
       url: '/dashboard',
@@ -154,7 +164,24 @@ export class DefaultLayoutComponent {
     }
   ];
 
+  constructor() {
+    // Set fallback menu immediately
+    this.menuService.setMenu(this.fallbackMenu);
+    this.sidebarItems$ = this.menuService.getMenu();
+  }
+
+  ngOnInit(): void {
+    // Load menu and permissions from API
+    // TODO: This will be called after login in future
+    // For now, it will use fallback menu if API not ready
+    this.appInitService.initializeApp().subscribe({
+      next: () => console.log('✅ App data loaded'),
+      error: () => console.log('⚠️ Using fallback menu')
+    });
+  }
+
   logout() {
+    this.appInitService.clearAppData();
     localStorage.clear();
     window.location.href = '/login';
   }
