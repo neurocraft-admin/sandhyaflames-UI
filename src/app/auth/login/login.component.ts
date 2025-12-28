@@ -37,13 +37,22 @@ export class LoginComponent {
         this.auth.setToken(res.token);
 
         // fetch permissions
-        this.auth.fetchPermissions(res.userId).subscribe(perms => {
-          this.auth.savePermissions(perms);
+        this.auth.fetchPermissions(res.userId).subscribe({
+          next: (perms) => {
+            console.log('Fetched permissions from API:', perms);
+            this.auth.savePermissions(perms);
+            console.log('Saved permissions to localStorage');
 
-          // ✅ navigate and refresh sidebar
-          this.router.navigate(['/dashboard']).then(() => {
-            window.location.reload();
-          });
+            // ✅ navigate and refresh sidebar
+            this.router.navigate(['/dashboard']).then(() => {
+              window.location.reload();
+            });
+          },
+          error: (err) => {
+            console.error('Failed to fetch permissions:', err);
+            // Navigate anyway, but without permissions
+            this.router.navigate(['/dashboard']);
+          }
         });
       },
       error: () => {

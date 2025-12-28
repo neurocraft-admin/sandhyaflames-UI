@@ -88,11 +88,6 @@ export class DefaultLayoutComponent implements OnInit {
           iconComponent: { name: 'cil-calendar' }
         },
         {
-          name: 'Delivery Mapping',
-          url: '/DeliveryMapping',
-          iconComponent: { name: 'cil-map' }
-        },
-        {
           name: 'Commercial Deliveries',
           url: '/CommercialDeliveries',
           iconComponent: { name: 'cil-briefcase' }

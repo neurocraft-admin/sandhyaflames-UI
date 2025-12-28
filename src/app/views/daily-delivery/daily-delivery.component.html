@@ -112,13 +112,13 @@
             </div>
           </div>
 
-          <button type="button" class="btn btn-sm btn-secondary mt-2" (click)="addItemRow()">
+          <button *ngIf="permissions.canCreate" type="button" class="btn btn-sm btn-secondary mt-2" (click)="addItemRow()">
             + Add Item
           </button>
         </div>
 
         <!-- ===== Save Button ===== -->
-        <div class="mt-4 text-end">
+        <div *ngIf="permissions.canCreate" class="mt-4 text-end">
           <button type="submit" class="btn btn-primary">
             Save Delivery
           </button>
@@ -131,49 +131,100 @@
   <div class="card mt-4 shadow-sm">
     <div class="card-body">
       <h5 class="card-title mb-3">Existing Deliveries</h5>
+      
+      <!-- Filter Controls -->
+      <div class="row mb-3">
+        <div class="col-md-3">
+          <label for="fromDate" class="form-label">From Date</label>
+          <input id="fromDate" type="date" class="form-control" [(ngModel)]="fromDate" />
+        </div>
+        <div class="col-md-3">
+          <label for="toDate" class="form-label">To Date</label>
+          <input id="toDate" type="date" class="form-control" [(ngModel)]="toDate" />
+        </div>
+        <div class="col-md-2">
+          <label for="filterStatus" class="form-label">Status</label>
+          <select id="filterStatus" class="form-select" [(ngModel)]="filterStatus">
+            <option value="All">All</option>
+            <option value="Open">Open</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+        <div class="col-md-4 d-flex align-items-end gap-2">
+          <button class="btn btn-primary" (click)="applyFilters()">
+            <i class="icon icon-search me-1"></i>Search
+          </button>
+          <button class="btn btn-secondary" (click)="clearFilters()">Clear</button>
+          <small class="text-muted ms-auto align-self-center">{{ paginatedDeliveries.length }} of {{ filteredDeliveries.length }}</small>
+        </div>
+      </div>
+
       <table class="table table-bordered table-striped table-sm align-middle">
         <thead class="table-light">
           <tr>
             <th>Date</th>
             <th>Driver</th>
             <th>Status</th>
-            <th>Completed</th>
-            <th>Pending</th>
-            <th>Cash</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let d of deliveries">
+          <tr *ngFor="let d of paginatedDeliveries">
             <td>{{ d.DeliveryDate | date: 'dd-MM-yyyy' }}</td>
             <td>{{ d.DriverName || '-' }}</td>
-            <td>{{ d.Status }}</td>
-            <td>{{ d.CompletedInvoices }}</td>
-            <td>{{ d.PendingInvoices }}</td>
-            <td>{{ d.CashCollected | currency: 'INR' }}</td>
             <td>
-              <button class="btn btn-info btn-sm me-1" (click)="recompute(d.DeliveryId)">
+              <span class="badge" [class.bg-success]="d.Status === 'Closed'" [class.bg-warning]="d.Status === 'Open'">
+                {{ d.Status }}
+              </span>
+            </td>
+            <td>
+              <button *ngIf="permissions.canUpdate" class="btn btn-info btn-sm me-1" (click)="recompute(d.DeliveryId)"
+                title="Recalculate planned items from delivery items (use after editing items or to populate initial metrics)">
                 Recompute
               </button>
-              <button class="btn btn-success btn-sm me-1" (click)="closeDelivery(d.DeliveryId)"
-                [disabled]="d.status === 'Closed'">
+              <button *ngIf="permissions.canUpdate" class="btn btn-success btn-sm me-1" (click)="closeDelivery(d.DeliveryId)"
+                [disabled]="d.Status === 'Closed'">
                 Close
               </button>
-              <button class="btn btn-warning btn-sm me-1" [routerLink]="['/DailyDeliveryUpdate', d.DeliveryId]">
+              <button *ngIf="permissions.canUpdate" class="btn btn-warning btn-sm" [routerLink]="['/DailyDeliveryUpdate', d.DeliveryId]">
                 Update
-              </button>
-              <button class="btn btn-primary btn-sm" [routerLink]="['/DeliveryMapping', d.DeliveryId]">
-                Map Customers
               </button>
             </td>
           </tr>
-          <tr *ngIf="!deliveries || deliveries.length === 0">
-            <td colspan="7" class="text-center text-muted">
-              No deliveries found.
+          <tr *ngIf="!paginatedDeliveries || paginatedDeliveries.length === 0">
+            <td colspan="4" class="text-center text-muted">
+              No deliveries found for selected filters.
             </td>
           </tr>
         </tbody>
       </table>
+
+      <!-- Pagination Controls -->
+      <div class="d-flex justify-content-between align-items-center" *ngIf="totalPages > 1">
+        <div>
+          <button class="btn btn-sm btn-outline-primary me-1" (click)="goToPage(1)" [disabled]="currentPage === 1">
+            First
+          </button>
+          <button class="btn btn-sm btn-outline-primary me-1" (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 1">
+            Previous
+          </button>
+          <span class="mx-2">Page {{ currentPage }} of {{ totalPages }}</span>
+          <button class="btn btn-sm btn-outline-primary me-1" (click)="goToPage(currentPage + 1)" [disabled]="currentPage === totalPages">
+            Next
+          </button>
+          <button class="btn btn-sm btn-outline-primary" (click)="goToPage(totalPages)" [disabled]="currentPage === totalPages">
+            Last
+          </button>
+        </div>
+        <div>
+          <select class="form-select form-select-sm" [(ngModel)]="pageSize" (change)="applyFilters()" style="width: auto; display: inline-block;">
+            <option [value]="5">5 per page</option>
+            <option [value]="10">10 per page</option>
+            <option [value]="25">25 per page</option>
+            <option [value]="50">50 per page</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
 </div>

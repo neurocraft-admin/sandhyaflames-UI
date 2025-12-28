@@ -56,7 +56,7 @@
         </thead>
         <tbody>
           <tr *ngFor="let resource of resources">
-            <td>{{ resource.resourceName }}</td>
+            <td>{{ resource.displayName || resource.resourceName }}</td>
             <td class="text-center">
               <input type="checkbox" class="form-check-input" [(ngModel)]="resource.canView" />
             </td>

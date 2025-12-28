@@ -7,6 +7,7 @@ import { environment } from '../../../environments/environment';
 interface Resource {
   resourceId: number;
   resourceName: string;
+  displayName?: string;
   canView: boolean;
   canCreate: boolean;
   canUpdate: boolean;

@@ -1,7 +1,6 @@
-// src/app/views/daily-delivery/daily-delivery.component.ts
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormArray, FormBuilder, Validators, FormGroup, AbstractControl } from '@angular/forms';
+import { ReactiveFormsModule, FormArray, FormBuilder, Validators, FormGroup, AbstractControl, FormsModule } from '@angular/forms';
 import { DailyDeliveryService } from '../../services/daily-delivery.service';
 import { ProductDropdownService, ProductOption } from '../../services/product-dropdown.service';
 import { DriverService } from '../../services/driver.service';
@@ -10,11 +9,12 @@ import { ToastService } from '../../services/toast.service';
 import { DeliveryCloseRequest } from '../../models/daily-delivery.model';
 import { Vehicle } from '../../models/vehicle.model';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
+import { AuthService } from '../../auth/auth.service';
 
 @Component({
   selector: 'app-daily-delivery',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule,RouterModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule, FormsModule],
   templateUrl: './daily-delivery.component.html'
 })
 
@@ -27,6 +27,15 @@ export class DailyDeliveryComponent {
   private toast = inject(ToastService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private authService = inject(AuthService);
+
+  // Permissions
+  permissions = {
+    canView: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false
+  };
 
   assignedDriverName: string = '';
   assignedDriverId: number | null = null;
@@ -37,7 +46,17 @@ export class DailyDeliveryComponent {
   drivers: any[] = [];
   vehicles: Vehicle[] = [];
   deliveries: any[] = [];
+  filteredDeliveries: any[] = [];
+  paginatedDeliveries: any[] = [];
   isEditing = signal(true);
+  
+  // Filter & Pagination
+  fromDate: string = this.today();
+  toDate: string = this.today();
+  filterStatus: string = 'Open';
+  currentPage: number = 1;
+  pageSize: number = 10;
+  totalPages: number = 1;
 
   form = this.fb.group({
     deliveryDate: [this.today(), Validators.required],
@@ -75,6 +94,24 @@ export class DailyDeliveryComponent {
     });
     this.addItemRow();
     this.loadDeliveries(); // Load existing list
+    this.loadPermissions(); // Load user permissions
+  }
+
+  loadPermissions() {
+    this.authService.getUserPermissions('DailyDelivery').subscribe({
+      next: (perms) => {
+        if (perms && perms.permissionMask !== undefined) {
+          this.permissions.canView = (perms.permissionMask & 1) === 1;
+          this.permissions.canCreate = (perms.permissionMask & 2) === 2;
+          this.permissions.canUpdate = (perms.permissionMask & 4) === 4;
+          this.permissions.canDelete = (perms.permissionMask & 8) === 8;
+        }
+      },
+      error: () => {
+        // If error, assume no permissions
+        this.permissions = { canView: false, canCreate: false, canUpdate: false, canDelete: false };
+      }
+    });
   }
   loadDriversForVehicle(vehicleId: number) {
       this.svc.getDriversForVehicle(vehicleId).subscribe(res => {
@@ -298,9 +335,63 @@ onProductChange(itemGroup: FormGroup, product?: any) {
   /* Load deliveries for table */
   loadDeliveries() {
     this.svc.list({}).subscribe({
-      next: res => this.deliveries = res || [],
+      next: res => {
+        this.deliveries = res || [];
+        this.applyFilters();
+      },
       error: () => this.toast.error('Failed to load deliveries')
     });
+  }
+
+  /* Apply filters and pagination */
+  applyFilters() {
+    let filtered = [...this.deliveries];
+
+    // Filter by date range
+    if (this.fromDate || this.toDate) {
+      filtered = filtered.filter(d => {
+        const deliveryDate = new Date(d.DeliveryDate).toISOString().substring(0, 10);
+        const matchesFrom = !this.fromDate || deliveryDate >= this.fromDate;
+        const matchesTo = !this.toDate || deliveryDate <= this.toDate;
+        return matchesFrom && matchesTo;
+      });
+    }
+
+    // Filter by status
+    if (this.filterStatus && this.filterStatus !== 'All') {
+      filtered = filtered.filter(d => d.Status === this.filterStatus);
+    }
+
+    // Sort by date descending (newest first)
+    filtered.sort((a, b) => new Date(b.DeliveryDate).getTime() - new Date(a.DeliveryDate).getTime());
+
+    this.filteredDeliveries = filtered;
+    this.totalPages = Math.ceil(this.filteredDeliveries.length / this.pageSize);
+    this.currentPage = 1;
+    this.updatePagination();
+  }
+
+  /* Update pagination */
+  updatePagination() {
+    const start = (this.currentPage - 1) * this.pageSize;
+    const end = start + this.pageSize;
+    this.paginatedDeliveries = this.filteredDeliveries.slice(start, end);
+  }
+
+  /* Pagination controls */
+  goToPage(page: number) {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+      this.updatePagination();
+    }
+  }
+
+  /* Clear filters */
+  clearFilters() {
+    this.fromDate = this.today();
+    this.toDate = this.today();
+    this.filterStatus = 'Open';
+    this.applyFilters();
   }
 
   /* Recompute metrics */

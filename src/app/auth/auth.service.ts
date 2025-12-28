@@ -55,4 +55,18 @@ export class AuthService {
     if (!this.permissions.length) this.loadPermissions();
     return this.permissions.find(p => p.resourceKey === resourceKey)?.permissionMask ?? 0;
   }
+
+  // ✅ Get user permissions for a specific resource (returns Observable)
+  getUserPermissions(resourceKey: string): Observable<{ permissionMask: number }> {
+    // Always reload from localStorage to get fresh data
+    this.loadPermissions();
+    const mask = this.permissions.find(p => p.resourceKey === resourceKey)?.permissionMask ?? 0;
+    
+    console.log('getUserPermissions:', resourceKey, 'mask:', mask, 'allPerms:', this.permissions);
+    
+    return new Observable(observer => {
+      observer.next({ permissionMask: mask });
+      observer.complete();
+    });
+  }
 }

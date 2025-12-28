@@ -44,12 +44,6 @@ export const navItems: AppNavData[] = [
     title: false
   },
   {
-    name: 'Delivery Mapping',
-    url: '/DeliveryMapping',
-    iconComponent: { name: 'cil-map' },
-    title: false
-  },
-  {
     name: 'Commercial Deliveries',
     url: '/CommercialDeliveries',
     iconComponent: { name: 'cil-briefcase' },
