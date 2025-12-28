@@ -36,6 +36,7 @@ export const routes: Routes = [
   { path: 'CommercialDeliveries',loadChildren: () => import('./views/commercial-delivery-list/routes').then(m => m.routes)},
   { path: 'DeliveryMapping',loadChildren: () => import('./views/delivery-mapping/routes').then(m => m.routes)},
   { path: 'IncomeExpenseForm',loadChildren: () => import('./views/income-expense/routes').then(m => m.routes)},
+  { path: 'role-permissions', loadComponent: () => import('./views/role-permissions/role-permissions.component').then(m => m.RolePermissionsComponent) },
 
 ]
   },

@@ -101,7 +101,8 @@ GO
 -- Role_Create (called by backend MapRoleManagementRoutes)
 -- ===============================================================
 CREATE OR ALTER PROCEDURE [dbo].[Role_Create]
-    @RoleName NVARCHAR(50)
+    @RoleName NVARCHAR(50),
+    @Description NVARCHAR(255) = NULL  -- Make it optional with default NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -114,10 +115,16 @@ BEGIN
     END
     
     -- Insert role
-    INSERT INTO Roles (RoleName, IsActive)
-    VALUES (@RoleName, 1);
+    INSERT INTO Roles (RoleName, Description, IsActive)
+    VALUES (@RoleName, @Description, 1);
     
     DECLARE @RoleId INT = SCOPE_IDENTITY();
+    
+    -- Automatically grant access to ALL menu items for this new role
+    INSERT INTO MenuAccess (MenuId, RoleId)
+    SELECT MenuId, @RoleId
+    FROM MenuItems
+    WHERE IsActive = 1;
     
     SELECT @RoleId AS RoleId;
 END

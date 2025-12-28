@@ -142,5 +142,13 @@ export const navItems: AppNavData[] = [
     resource: 'Roles',
     perm: 1,
     title: false
+  },
+  {
+    name: 'Role Permissions',
+    url: '/role-permissions',
+    iconComponent: { name: 'cil-lock-locked' },
+    resource: 'Roles',
+    perm: 1,
+    title: false
   }
 ];

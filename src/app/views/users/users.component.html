@@ -21,8 +21,12 @@
             <input type="text" class="form-control" formControlName="fullName" />
           </div>
           <div class="col-md-6 mb-3">
-            <label class="form-label">Email *</label>
-            <input type="email" class="form-control" formControlName="email" />
+            <label class="form-label">Username *</label>
+            <div class="input-group">
+              <input type="text" class="form-control" formControlName="username" placeholder="username" />
+              <span class="input-group-text">@{{ emailDomain }}</span>
+            </div>
+            <small class="form-text text-muted">Email will be: username@{{ emailDomain }}</small>
           </div>
           <div class="col-md-6 mb-3">
             <label class="form-label">Password {{ isEditing ? '(leave empty to keep current)' : '*' }}</label>
@@ -31,10 +35,7 @@
           <div class="col-md-6 mb-3">
             <label class="form-label">Role *</label>
             <select class="form-control" formControlName="roleId">
-              <option [value]="1">Administrator</option>
-              <option [value]="2">Manager</option>
-              <option [value]="3">Operator</option>
-              <option [value]="4">Viewer</option>
+              <option *ngFor="let role of roles" [value]="role.roleId">{{ role.roleName }}</option>
             </select>
           </div>
           <div class="col-md-6 mb-3" *ngIf="isEditing">
@@ -71,8 +72,8 @@
       <tr *ngFor="let u of users">
         <td>{{ u.userId }}</td>
         <td>{{ u.fullName }}</td>
-        <td>{{ u.email }}</td>
-        <td>{{ u.roleId }}</td>
+        <td>{{ u.email || 'N/A' }}</td>
+        <td>{{ getRoleName(u.roleId) }}</td>
         <td>
           <span class="badge bg-success" *ngIf="u.isActive">Active</span>
           <span class="badge bg-danger" *ngIf="!u.isActive">Inactive</span>

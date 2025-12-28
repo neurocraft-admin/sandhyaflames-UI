@@ -24,26 +24,33 @@ export class UserService {
   }
 
   createUser(user: any): Observable<any> {
-    // Map password to passwordHash for backend DTO
+    // Backend expects password field (plain text), it will hash it
     const dto = {
       fullName: user.fullName,
       email: user.email,
-      passwordHash: user.password,  // Backend expects passwordHash, not password
+      password: user.password,  // Send plain password, backend will hash it
       roleId: user.roleId
     };
-    return this.http.post(`${this.apiUrl}/create`, dto);
+    // Backend expects: POST /api/users (no /create suffix)
+    return this.http.post(this.apiUrl, dto);
   }
 
   updateUser(user: any): Observable<any> {
-    // Map to backend DTO structure
-    const dto = {
-      userId: user.userId,
+    // Map to backend DTO structure (ID goes in URL, not body)
+    const dto: any = {
       fullName: user.fullName,
       email: user.email,
       roleId: user.roleId,
       isActive: user.isActive
     };
-    return this.http.put(`${this.apiUrl}/update`, dto);
+    
+    // Include password only if provided (for password reset)
+    if (user.password && user.password.trim() !== '') {
+      dto.password = user.password;
+    }
+    
+    // Backend expects: PUT /api/users/{id} with ID in URL path
+    return this.http.put(`${this.apiUrl}/${user.userId}`, dto);
   }
 
   deleteUser(userId: number): Observable<any> {

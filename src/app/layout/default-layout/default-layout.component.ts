@@ -70,6 +70,11 @@ export class DefaultLayoutComponent implements OnInit {
           name: 'Roles',
           url: '/roles',
           iconComponent: { name: 'cil-people' }
+        },
+        {
+          name: 'Role Permissions',
+          url: '/role-permissions',
+          iconComponent: { name: 'cil-lock-locked' }
         }
       ]
     },
@@ -172,8 +177,6 @@ export class DefaultLayoutComponent implements OnInit {
 
   ngOnInit(): void {
     // Load menu and permissions from API
-    // TODO: This will be called after login in future
-    // For now, it will use fallback menu if API not ready
     this.appInitService.initializeApp().subscribe({
       next: () => console.log('✅ App data loaded'),
       error: () => console.log('⚠️ Using fallback menu')
