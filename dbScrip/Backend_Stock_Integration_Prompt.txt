@@ -1,0 +1,743 @@
+=============================================
+BACKEND IMPLEMENTATION PROMPT
+Stock Register Integration with Purchase Entry and Daily Delivery
+=============================================
+
+CONTEXT:
+You have a .NET Core Minimal API backend with the following existing endpoints:
+- POST /api/purchaseentry - Creates purchase entries
+- POST /api/dailydelivery - Creates daily deliveries
+- POST /api/dailydelivery/close/{id} - Closes/completes deliveries
+
+OBJECTIVE:
+Integrate automatic stock updates so that:
+1. Purchase Entry → Adds filled stock to StockRegister
+2. Daily Delivery Creation → Deducts filled stock from StockRegister
+3. Daily Delivery Closure → Adds empty/damaged stock back to StockRegister
+
+PREREQUISITES:
+✅ Database tables created: StockRegister, StockTransactions
+✅ Stored procedures created: sp_UpdateStockFromPurchase, sp_UpdateStockFromDeliveryAssignment, sp_UpdateStockFromDeliveryReturn
+✅ Database script location: dbScrip/sp_StockRegister.sql (already created)
+
+=============================================
+TASK 1: CREATE STOCK REGISTER ROUTES
+=============================================
+
+FILE TO CREATE: Routes/StockRegisterRoutes.cs
+
+LOCATION: In your backend API project, create this new file in the Routes folder
+
+FULL CODE:
+```csharp
+using Microsoft.Data.SqlClient;
+using System.Data;
+
+namespace YourNamespace.Routes
+{
+    public static class StockRegisterRoutes
+    {
+        public static void MapStockRegisterRoutes(this WebApplication app)
+        {
+            // ===============================================================
+            // 1️⃣ GET ALL STOCK (WITH FILTERS)
+            // ===============================================================
+            app.MapGet("/api/stockregister", async (
+                int? productId,
+                int? categoryId,
+                int? subCategoryId,
+                string? searchTerm,
+                IConfiguration config) =>
+            {
+                try
+                {
+                    using var conn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+                    using var cmd = new SqlCommand("sp_GetStockRegister", conn)
+                    {
+                        CommandType = CommandType.StoredProcedure
+                    };
+
+                    cmd.Parameters.AddWithValue("@ProductId", (object?)productId ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@CategoryId", (object?)categoryId ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@SubCategoryId", (object?)subCategoryId ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@SearchTerm", (object?)searchTerm ?? DBNull.Value);
+
+                    await conn.OpenAsync();
+                    using var reader = await cmd.ExecuteReaderAsync();
+
+                    var stockList = new List<object>();
+                    while (await reader.ReadAsync())
+                    {
+                        stockList.Add(new
+                        {
+                            stockId = reader.GetInt32(reader.GetOrdinal("StockId")),
+                            productId = reader.GetInt32(reader.GetOrdinal("ProductId")),
+                            productName = reader.GetString(reader.GetOrdinal("ProductName")),
+                            categoryName = reader.GetString(reader.GetOrdinal("CategoryName")),
+                            subCategoryName = reader.GetString(reader.GetOrdinal("SubCategoryName")),
+                            filledStock = reader.GetInt32(reader.GetOrdinal("FilledStock")),
+                            emptyStock = reader.GetInt32(reader.GetOrdinal("EmptyStock")),
+                            damagedStock = reader.GetInt32(reader.GetOrdinal("DamagedStock")),
+                            totalStock = reader.GetInt32(reader.GetOrdinal("TotalStock")),
+                            lastUpdated = reader.GetDateTime(reader.GetOrdinal("LastUpdated")),
+                            updatedBy = reader.IsDBNull(reader.GetOrdinal("UpdatedBy")) ? null : reader.GetString(reader.GetOrdinal("UpdatedBy"))
+                        });
+                    }
+
+                    return Results.Ok(stockList);
+                }
+                catch (SqlException sqlEx)
+                {
+                    Console.WriteLine($"SQL Error in GetStockRegister: {sqlEx.Message}");
+                    return Results.Json(
+                        new { success = false, errorCode = "SQL_ERROR", message = sqlEx.Message },
+                        statusCode: 500);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in GetStockRegister: {ex.Message}");
+                    return Results.Json(
+                        new { success = false, errorCode = "GENERAL_ERROR", message = ex.Message },
+                        statusCode: 500);
+                }
+            })
+            .WithTags("Stock Register")
+            .WithName("GetStockRegister");
+
+            // ===============================================================
+            // 2️⃣ GET STOCK SUMMARY (BY CATEGORY)
+            // ===============================================================
+            app.MapGet("/api/stockregister/summary", async (IConfiguration config) =>
+            {
+                try
+                {
+                    using var conn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+                    using var cmd = new SqlCommand("sp_GetStockSummary", conn)
+                    {
+                        CommandType = CommandType.StoredProcedure
+                    };
+
+                    await conn.OpenAsync();
+                    using var reader = await cmd.ExecuteReaderAsync();
+
+                    var summaryList = new List<object>();
+                    while (await reader.ReadAsync())
+                    {
+                        summaryList.Add(new
+                        {
+                            categoryName = reader.GetString(reader.GetOrdinal("CategoryName")),
+                            subCategoryName = reader.GetString(reader.GetOrdinal("SubCategoryName")),
+                            totalFilledStock = reader.GetInt32(reader.GetOrdinal("TotalFilledStock")),
+                            totalEmptyStock = reader.GetInt32(reader.GetOrdinal("TotalEmptyStock")),
+                            totalDamagedStock = reader.GetInt32(reader.GetOrdinal("TotalDamagedStock")),
+                            totalStock = reader.GetInt32(reader.GetOrdinal("TotalStock"))
+                        });
+                    }
+
+                    return Results.Ok(summaryList);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in GetStockSummary: {ex.Message}");
+                    return Results.Json(
+                        new { success = false, errorCode = "GENERAL_ERROR", message = ex.Message },
+                        statusCode: 500);
+                }
+            })
+            .WithTags("Stock Register")
+            .WithName("GetStockSummary");
+
+            // ===============================================================
+            // 3️⃣ INITIALIZE STOCK REGISTER (ONE-TIME SETUP)
+            // ===============================================================
+            app.MapPost("/api/stockregister/initialize", async (IConfiguration config) =>
+            {
+                try
+                {
+                    using var conn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+                    using var cmd = new SqlCommand("sp_InitializeStockRegister", conn)
+                    {
+                        CommandType = CommandType.StoredProcedure
+                    };
+
+                    await conn.OpenAsync();
+                    using var reader = await cmd.ExecuteReaderAsync();
+
+                    if (await reader.ReadAsync())
+                    {
+                        var success = reader.GetInt32(reader.GetOrdinal("success"));
+                        var message = reader.GetString(reader.GetOrdinal("message"));
+
+                        return success == 1
+                            ? Results.Ok(new { success = true, message })
+                            : Results.BadRequest(new { success = false, message });
+                    }
+
+                    return Results.Json(
+                        new { success = false, message = "Failed to initialize stock register" },
+                        statusCode: 500);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in InitializeStockRegister: {ex.Message}");
+                    return Results.Json(
+                        new { success = false, errorCode = "GENERAL_ERROR", message = ex.Message },
+                        statusCode: 500);
+                }
+            })
+            .WithTags("Stock Register")
+            .WithName("InitializeStockRegister");
+
+            // ===============================================================
+            // 4️⃣ MANUAL STOCK ADJUSTMENT
+            // ===============================================================
+            app.MapPost("/api/stockregister/adjust", async (
+                StockAdjustmentRequest request,
+                IConfiguration config) =>
+            {
+                try
+                {
+                    using var conn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+                    using var cmd = new SqlCommand("sp_AdjustStock", conn)
+                    {
+                        CommandType = CommandType.StoredProcedure
+                    };
+
+                    cmd.Parameters.AddWithValue("@ProductId", request.ProductId);
+                    cmd.Parameters.AddWithValue("@FilledChange", request.FilledChange);
+                    cmd.Parameters.AddWithValue("@EmptyChange", request.EmptyChange);
+                    cmd.Parameters.AddWithValue("@DamagedChange", request.DamagedChange);
+                    cmd.Parameters.AddWithValue("@Remarks", (object?)request.Remarks ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@CreatedBy", (object?)request.CreatedBy ?? "System");
+
+                    await conn.OpenAsync();
+                    using var reader = await cmd.ExecuteReaderAsync();
+
+                    if (await reader.ReadAsync())
+                    {
+                        var success = reader.GetInt32(reader.GetOrdinal("success"));
+                        var message = reader.GetString(reader.GetOrdinal("message"));
+
+                        return success == 1
+                            ? Results.Ok(new { success = true, message })
+                            : Results.BadRequest(new { success = false, message });
+                    }
+
+                    return Results.Json(
+                        new { success = false, message = "Failed to adjust stock" },
+                        statusCode: 500);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in AdjustStock: {ex.Message}");
+                    return Results.Json(
+                        new { success = false, errorCode = "GENERAL_ERROR", message = ex.Message },
+                        statusCode: 500);
+                }
+            })
+            .WithTags("Stock Register")
+            .WithName("AdjustStock");
+        }
+    }
+
+    // ===============================================================
+    // REQUEST MODELS
+    // ===============================================================
+    public record StockAdjustmentRequest(
+        int ProductId,
+        int FilledChange,
+        int EmptyChange,
+        int DamagedChange,
+        string? Remarks,
+        string? CreatedBy
+    );
+}
+```
+
+REGISTRATION:
+Add this line in your Program.cs (after other MapXXXRoutes() calls):
+```csharp
+app.MapStockRegisterRoutes();
+```
+
+=============================================
+TASK 2: MODIFY PURCHASE ENTRY ENDPOINT
+=============================================
+
+FILE TO MODIFY: Routes/PurchaseEntryRoutes.cs (or wherever your purchase endpoint is)
+
+FIND THIS CODE (your existing POST endpoint):
+```csharp
+app.MapPost("/api/purchaseentry", async ([FromBody] PurchaseEntryRequest request, IConfiguration config) =>
+{
+    // ... your existing code that saves the purchase ...
+    
+    // Somewhere near the end, you return:
+    return Results.Ok(new { success = true, purchaseId = purchaseId });
+});
+```
+
+REPLACE WITH (add stock update BEFORE the return statement):
+```csharp
+app.MapPost("/api/purchaseentry", async ([FromBody] PurchaseEntryRequest request, IConfiguration config) =>
+{
+    // ... your existing code that saves the purchase ...
+    
+    // Get the purchaseId from your save operation
+    int purchaseId = /* your existing logic to get purchaseId */;
+    
+    // ✨ NEW CODE START: Update stock register for each purchased item
+    foreach (var item in request.Items)
+    {
+        try
+        {
+            using var stockConn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+            using var stockCmd = new SqlCommand("sp_UpdateStockFromPurchase", stockConn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+            
+            stockCmd.Parameters.AddWithValue("@PurchaseId", purchaseId);
+            stockCmd.Parameters.AddWithValue("@ProductId", item.ProductId);
+            stockCmd.Parameters.AddWithValue("@Quantity", item.Quantity);
+            stockCmd.Parameters.AddWithValue("@Remarks", $"Purchase Entry #{purchaseId}");
+            
+            await stockConn.OpenAsync();
+            using var reader = await stockCmd.ExecuteReaderAsync();
+            
+            if (await reader.ReadAsync())
+            {
+                var success = reader.GetInt32(reader.GetOrdinal("success"));
+                var message = reader.GetString(reader.GetOrdinal("message"));
+                Console.WriteLine($"Stock Update: {message}");
+            }
+        }
+        catch (Exception stockEx)
+        {
+            // Log but don't fail the purchase
+            Console.WriteLine($"⚠️ Stock update failed for Product {item.ProductId}: {stockEx.Message}");
+            // Continue processing - stock can be adjusted manually later
+        }
+    }
+    // ✨ NEW CODE END
+    
+    return Results.Ok(new { success = true, purchaseId = purchaseId });
+});
+```
+
+IMPORTANT NOTES:
+- Add this code AFTER the purchase is successfully saved
+- Use try-catch so stock update failure doesn't fail the entire purchase
+- Log errors for debugging
+- Stock can be manually adjusted later if auto-update fails
+
+=============================================
+TASK 3: MODIFY DAILY DELIVERY CREATE ENDPOINT
+=============================================
+
+FILE TO MODIFY: Routes/DailyDeliveryRoutes.cs (or wherever your delivery endpoint is)
+
+FIND THIS CODE:
+```csharp
+app.MapPost("/api/dailydelivery", async ([FromBody] DeliveryRequest request, IConfiguration config) =>
+{
+    // ... your existing code that creates the delivery and items ...
+    
+    // Somewhere near the end:
+    return Results.Ok(new { success = true, deliveryId = deliveryId });
+});
+```
+
+REPLACE WITH (add stock deduction BEFORE the return):
+```csharp
+app.MapPost("/api/dailydelivery", async ([FromBody] DeliveryRequest request, IConfiguration config) =>
+{
+    // ... your existing code that creates the delivery and items ...
+    
+    // Get the deliveryId from your save operation
+    int deliveryId = /* your existing logic to get deliveryId */;
+    
+    // ✨ NEW CODE START: Deduct stock when delivery is created
+    try
+    {
+        using var stockConn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+        using var stockCmd = new SqlCommand("sp_UpdateStockFromDeliveryAssignment", stockConn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        
+        stockCmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+        
+        await stockConn.OpenAsync();
+        using var reader = await stockCmd.ExecuteReaderAsync();
+        
+        if (await reader.ReadAsync())
+        {
+            var success = reader.GetInt32(reader.GetOrdinal("success"));
+            var message = reader.GetString(reader.GetOrdinal("message"));
+            
+            if (success == 1)
+            {
+                Console.WriteLine($"✅ Stock Deduction: {message}");
+            }
+            else
+            {
+                Console.WriteLine($"⚠️ Stock Deduction Warning: {message}");
+            }
+        }
+    }
+    catch (Exception stockEx)
+    {
+        // Log but don't fail the delivery creation
+        Console.WriteLine($"⚠️ Stock deduction failed for Delivery {deliveryId}: {stockEx.Message}");
+        // Continue - delivery is still valid, stock can be adjusted manually
+    }
+    // ✨ NEW CODE END
+    
+    return Results.Ok(new { success = true, deliveryId = deliveryId });
+});
+```
+
+IMPORTANT NOTES:
+- Add this AFTER delivery and items are saved to database
+- Stock deduction happens automatically based on DailyDeliveryItems table
+- The SP reads DailyDeliveryItems and deducts from FilledStock
+- Use try-catch to prevent stock errors from failing delivery creation
+
+=============================================
+TASK 4: MODIFY DAILY DELIVERY CLOSE ENDPOINT
+=============================================
+
+FILE TO MODIFY: Routes/DailyDeliveryRoutes.cs
+
+FIND THIS CODE:
+```csharp
+app.MapPost("/api/dailydelivery/close/{id}", async (
+    int id, 
+    IConfiguration config) =>
+{
+    // ... your existing code that closes the delivery ...
+    
+    return Results.Ok(new { success = true });
+});
+```
+
+REPLACE WITH (add empty/damaged return logic):
+```csharp
+app.MapPost("/api/dailydelivery/close/{id}", async (
+    int id,
+    [FromBody] DeliveryCloseRequest? request,  // May include empty/damaged counts
+    IConfiguration config) =>
+{
+    // ... your existing code that closes the delivery ...
+    
+    // ✨ NEW CODE START: Update stock with returned empty/damaged cylinders
+    try
+    {
+        // Get empty and damaged counts from request or calculate from delivery items
+        int emptyCylindersReturned = request?.EmptyCylindersReturned ?? 0;
+        int damagedCylinders = request?.DamagedCylinders ?? 0;
+        
+        // If not provided in request, you might want to sum from DailyDeliveryItemActuals
+        if (emptyCylindersReturned == 0 && damagedCylinders == 0)
+        {
+            // Calculate from item actuals if available
+            using var calcConn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+            using var calcCmd = new SqlCommand(@"
+                SELECT 
+                    SUM(ISNULL(EmptyReturned, 0)) as TotalEmpty,
+                    SUM(ISNULL(DamagedReturned, 0)) as TotalDamaged
+                FROM DailyDeliveryItemActuals 
+                WHERE DeliveryId = @DeliveryId", calcConn);
+            
+            calcCmd.Parameters.AddWithValue("@DeliveryId", id);
+            await calcConn.OpenAsync();
+            
+            using var calcReader = await calcCmd.ExecuteReaderAsync();
+            if (await calcReader.ReadAsync())
+            {
+                emptyCylindersReturned = calcReader.IsDBNull(0) ? 0 : calcReader.GetInt32(0);
+                damagedCylinders = calcReader.IsDBNull(1) ? 0 : calcReader.GetInt32(1);
+            }
+        }
+        
+        // Update stock register with returns
+        using var stockConn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+        using var stockCmd = new SqlCommand("sp_UpdateStockFromDeliveryReturn", stockConn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        
+        stockCmd.Parameters.AddWithValue("@DeliveryId", id);
+        stockCmd.Parameters.AddWithValue("@EmptyCylindersReturned", emptyCylindersReturned);
+        stockCmd.Parameters.AddWithValue("@DamagedCylinders", damagedCylinders);
+        
+        await stockConn.OpenAsync();
+        using var reader = await stockCmd.ExecuteReaderAsync();
+        
+        if (await reader.ReadAsync())
+        {
+            var success = reader.GetInt32(reader.GetOrdinal("success"));
+            var message = reader.GetString(reader.GetOrdinal("message"));
+            
+            if (success == 1)
+            {
+                Console.WriteLine($"✅ Stock Return: {message} (Empty: {emptyCylindersReturned}, Damaged: {damagedCylinders})");
+            }
+            else
+            {
+                Console.WriteLine($"⚠️ Stock Return Warning: {message}");
+            }
+        }
+    }
+    catch (Exception stockEx)
+    {
+        // Log but don't fail the delivery closure
+        Console.WriteLine($"⚠️ Stock return update failed for Delivery {id}: {stockEx.Message}");
+    }
+    // ✨ NEW CODE END
+    
+    return Results.Ok(new { success = true });
+});
+```
+
+ADD THIS REQUEST MODEL (if not already exists):
+```csharp
+public record DeliveryCloseRequest(
+    int? EmptyCylindersReturned,
+    int? DamagedCylinders
+);
+```
+
+IMPORTANT NOTES:
+- Empty/damaged counts can come from:
+  1. Request body (if frontend sends it)
+  2. DailyDeliveryItemActuals table (sum of EmptyReturned/DamagedReturned fields)
+- The code tries to get from request first, then falls back to database query
+- Stock return updates both EmptyStock and DamagedStock in StockRegister
+
+=============================================
+TASK 5: ADD REQUIRED USING STATEMENTS
+=============================================
+
+At the top of all modified files, ensure you have:
+```csharp
+using Microsoft.Data.SqlClient;
+using System.Data;
+```
+
+If using Microsoft.AspNetCore.Mvc for [FromBody]:
+```csharp
+using Microsoft.AspNetCore.Mvc;
+```
+
+=============================================
+TESTING PROCEDURE
+=============================================
+
+STEP 1: Initialize Database
+Execute in SQL Server Management Studio:
+- Run the complete sp_StockRegister.sql file
+- Verify tables exist:
+  SELECT * FROM StockRegister;
+  SELECT * FROM StockTransactions;
+
+STEP 2: Build and Run Backend
+- Rebuild your .NET project
+- Start the API server
+- Check console for startup messages
+
+STEP 3: Initialize Stock (One-time)
+POST https://localhost:7183/api/stockregister/initialize
+Expected Response: { "success": true, "message": "Stock register initialized for X products" }
+
+STEP 4: Test Purchase Entry → Stock
+Create a purchase entry through your UI or API:
+{
+  "purchaseDate": "2025-12-26",
+  "items": [
+    { "productId": 1, "quantity": 100 }
+  ]
+}
+
+Verify in database:
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- Should show FilledStock = 100
+
+SELECT * FROM StockTransactions WHERE ProductId = 1;
+-- Should show TransactionType = 'Purchase', FilledChange = 100
+
+STEP 5: Test Daily Delivery → Stock Deduction
+Create a delivery through your UI or API:
+{
+  "deliveryDate": "2025-12-26",
+  "items": [
+    { "productId": 1, "noOfCylinders": 20 }
+  ]
+}
+
+Verify in database:
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- Should show FilledStock = 80 (100 - 20)
+
+SELECT * FROM StockTransactions WHERE ProductId = 1 AND TransactionType = 'DeliveryAssigned';
+-- Should show FilledChange = -20
+
+STEP 6: Test Delivery Closure → Empty/Damaged Return
+Close the delivery through your UI:
+{
+  "emptyCylindersReturned": 18,
+  "damagedCylinders": 2
+}
+
+Verify in database:
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- Should show:
+--   FilledStock = 80
+--   EmptyStock = 18
+--   DamagedStock = 2
+--   TotalStock = 100
+
+SELECT * FROM StockTransactions WHERE ProductId = 1 AND TransactionType = 'DeliveryCompleted';
+-- Should show EmptyChange = 18, DamagedChange = 2
+
+EXPECTED FINAL STATE:
+Product ID 1 (after all operations):
+- Started: 0 filled, 0 empty, 0 damaged
+- After purchase: 100 filled, 0 empty, 0 damaged
+- After delivery created: 80 filled, 0 empty, 0 damaged
+- After delivery closed: 80 filled, 18 empty, 2 damaged
+✅ Total matches: 100 cylinders accounted for
+
+=============================================
+TROUBLESHOOTING
+=============================================
+
+ERROR: "Invalid object name 'StockRegister'"
+FIX: Run sp_StockRegister.sql in SQL Server Management Studio first
+
+ERROR: "Could not find stored procedure 'sp_UpdateStockFromPurchase'"
+FIX: Execute the entire sp_StockRegister.sql file (contains all 10 stored procedures)
+
+ERROR: Stock shows negative numbers
+FIX: 
+1. Check if stock was initialized: POST /api/stockregister/initialize
+2. Manually adjust stock: POST /api/stockregister/adjust
+   { "productId": 1, "filledChange": 1000, "emptyChange": 0, "damagedChange": 0, "remarks": "Initial stock" }
+
+ERROR: Purchase/Delivery works but stock doesn't update
+FIX:
+1. Check console logs for error messages
+2. Verify stored procedures exist in database
+3. Check connection string is correct
+4. Ensure ProductId in purchase/delivery matches Products table
+
+ERROR: Stock updates twice for same transaction
+FIX: Each endpoint should only call stock update once - check for duplicate code
+
+=============================================
+VERIFICATION QUERIES
+=============================================
+
+-- View all stock levels with product names
+SELECT 
+    p.ProductName,
+    sr.FilledStock,
+    sr.EmptyStock,
+    sr.DamagedStock,
+    (sr.FilledStock + sr.EmptyStock + sr.DamagedStock) AS TotalStock,
+    sr.LastUpdated
+FROM StockRegister sr
+INNER JOIN Products p ON sr.ProductId = p.ProductId
+ORDER BY p.ProductName;
+
+-- View recent stock transactions
+SELECT TOP 20
+    st.TransactionDate,
+    p.ProductName,
+    st.TransactionType,
+    st.FilledChange,
+    st.EmptyChange,
+    st.DamagedChange,
+    st.ReferenceType,
+    st.ReferenceId,
+    st.Remarks
+FROM StockTransactions st
+INNER JOIN Products p ON st.ProductId = p.ProductId
+ORDER BY st.TransactionDate DESC;
+
+-- Check stock for specific product
+DECLARE @ProductId INT = 1;
+SELECT 
+    p.ProductName,
+    sr.FilledStock,
+    sr.EmptyStock,
+    sr.DamagedStock,
+    (SELECT COUNT(*) FROM StockTransactions WHERE ProductId = @ProductId) AS TotalTransactions
+FROM StockRegister sr
+INNER JOIN Products p ON sr.ProductId = p.ProductId
+WHERE sr.ProductId = @ProductId;
+
+-- View stock movements for a specific delivery
+DECLARE @DeliveryId INT = 1;
+SELECT 
+    st.TransactionDate,
+    p.ProductName,
+    st.TransactionType,
+    st.FilledChange,
+    st.EmptyChange,
+    st.DamagedChange
+FROM StockTransactions st
+INNER JOIN Products p ON st.ProductId = p.ProductId
+WHERE st.ReferenceType = 'Delivery' AND st.ReferenceId = @DeliveryId
+ORDER BY st.TransactionDate;
+
+=============================================
+COMPLETION CHECKLIST
+=============================================
+
+Database Setup:
+[ ] Execute sp_StockRegister.sql in SQL Server
+[ ] Verify StockRegister table exists
+[ ] Verify StockTransactions table exists
+[ ] Verify all 10 stored procedures exist
+
+Backend Code:
+[ ] Create Routes/StockRegisterRoutes.cs
+[ ] Add app.MapStockRegisterRoutes() in Program.cs
+[ ] Modify PurchaseEntryRoutes.cs with stock update
+[ ] Modify DailyDeliveryRoutes.cs creation endpoint with stock deduction
+[ ] Modify DailyDeliveryRoutes.cs close endpoint with stock return
+[ ] Add required using statements
+[ ] Rebuild backend project
+
+Testing:
+[ ] POST /api/stockregister/initialize (one-time)
+[ ] Create purchase entry → verify stock increases
+[ ] Create delivery → verify stock decreases
+[ ] Close delivery → verify empty/damaged increases
+[ ] Check Stock Register UI → verify data displays correctly
+[ ] Run verification SQL queries → verify transactions logged
+
+Done! Your stock register should now automatically update across the entire workflow.
+
+=============================================
+NEXT STEPS AFTER IMPLEMENTATION
+=============================================
+
+1. Frontend Enhancement (Optional):
+   - Show stock levels when creating deliveries (warn if stock is low)
+   - Display stock warning icon when stock < 10 for a product
+   - Add stock report page showing movement history
+
+2. Business Rules (Optional):
+   - Prevent delivery creation if stock is insufficient
+   - Send alerts when stock falls below threshold
+   - Auto-generate purchase orders when stock is low
+
+3. Refilling Process (Future):
+   - Add "Refill Empty Cylinders" feature
+   - Convert empty → filled (deduct empty, add filled)
+   - Track refilling vendor/costs
+
+These are enhancements for later - the core integration will be complete after following this prompt.

@@ -1,0 +1,647 @@
+=============================================
+STOCK REGISTER DEBUGGING GUIDE
+Purchase Entry Stock Not Showing - Troubleshooting Steps
+=============================================
+
+ISSUE: Stock not appearing in Stock Register after creating Purchase Entry
+OBJECTIVE: Identify and fix why stock is not updating
+
+=============================================
+STEP 1: VERIFY DATABASE TABLES EXIST
+=============================================
+
+Run these queries in SQL Server Management Studio:
+
+```sql
+-- Check if StockRegister table exists
+SELECT * FROM INFORMATION_SCHEMA.TABLES 
+WHERE TABLE_NAME = 'StockRegister';
+-- Should return 1 row. If empty, table doesn't exist.
+
+-- Check if StockTransactions table exists
+SELECT * FROM INFORMATION_SCHEMA.TABLES 
+WHERE TABLE_NAME = 'StockTransactions';
+-- Should return 1 row. If empty, table doesn't exist.
+
+-- Check table structure
+SELECT COLUMN_NAME, DATA_TYPE 
+FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_NAME = 'StockRegister';
+-- Should show: StockId, ProductId, FilledStock, EmptyStock, DamagedStock, LastUpdated, UpdatedBy
+
+SELECT COLUMN_NAME, DATA_TYPE 
+FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_NAME = 'StockTransactions';
+-- Should show: TransactionId, ProductId, TransactionType, FilledChange, EmptyChange, DamagedChange, ReferenceId, ReferenceType, Remarks, TransactionDate, CreatedBy
+```
+
+❌ **IF TABLES DON'T EXIST:**
+Execute the complete sp_StockRegister.sql file in SSMS:
+- File location: dbScrip/sp_StockRegister.sql
+- Select all content (Ctrl+A)
+- Execute (F5)
+
+=============================================
+STEP 2: VERIFY STORED PROCEDURES EXIST
+=============================================
+
+```sql
+-- Check if stored procedures exist
+SELECT name FROM sys.procedures 
+WHERE name IN (
+    'sp_GetStockRegister',
+    'sp_GetStockSummary',
+    'sp_GetStockTransactionHistory',
+    'sp_AdjustStock',
+    'sp_InitializeStockRegister',
+    'sp_UpdateStockFromPurchase',
+    'sp_UpdateStockFromDeliveryAssignment',
+    'sp_UpdateStockFromDeliveryReturn'
+);
+-- Should return 8 rows. If less, some SPs are missing.
+```
+
+❌ **IF STORED PROCEDURES DON'T EXIST:**
+Execute sp_StockRegister.sql again (contains all SP definitions)
+
+=============================================
+STEP 3: CHECK IF STOCK WAS INITIALIZED
+=============================================
+
+```sql
+-- Check if stock register has any records
+SELECT COUNT(*) as RecordCount FROM StockRegister;
+-- Should match number of products in your Products table
+
+-- Check which products have stock records
+SELECT 
+    p.ProductId,
+    p.ProductName,
+    sr.StockId
+FROM Products p
+LEFT JOIN StockRegister sr ON p.ProductId = sr.ProductId
+WHERE p.IsActive = 1
+ORDER BY p.ProductName;
+-- Products with NULL StockId are NOT initialized
+```
+
+❌ **IF NO RECORDS IN StockRegister:**
+You need to initialize stock first!
+
+**Option A: Call API Endpoint (RECOMMENDED)**
+Using Postman, Thunder Client, or browser:
+```
+POST https://localhost:7183/api/stockregister/initialize
+```
+
+Expected Response:
+```json
+{
+  "success": true,
+  "message": "Initialized stock for X products",
+  "initializedCount": 15
+}
+```
+
+**Option B: Run SQL Directly**
+```sql
+EXEC sp_InitializeStockRegister;
+```
+
+**After initialization, verify:**
+```sql
+SELECT COUNT(*) FROM StockRegister;
+-- Should now have records
+```
+
+=============================================
+STEP 4: CHECK BACKEND CONSOLE LOGS
+=============================================
+
+When you create a Purchase Entry, check your backend console for:
+
+✅ **EXPECTED OUTPUT (Success):**
+```
+✅ Stock updated for Product 1: Stock increased by 100 units
+✅ Stock updated for Product 2: Stock increased by 50 units
+```
+
+⚠️ **WARNING OUTPUT (Non-critical errors):**
+```
+⚠️ Stock update failed for Product 1: Invalid object name 'StockRegister'
+   Purchase was saved successfully. Stock can be adjusted manually.
+```
+
+❌ **NO OUTPUT:**
+The stock update code is not being executed at all.
+
+=============================================
+STEP 5: VERIFY PURCHASE ENTRY CODE INTEGRATION
+=============================================
+
+Check your Purchase Entry endpoint code has the stock update loop:
+
+**Required Code Pattern:**
+```csharp
+app.MapPost("/api/purchaseentry", async (...) =>
+{
+    // ... existing purchase save logic ...
+    
+    int purchaseId = /* get from save */;
+    
+    // THIS SECTION MUST BE PRESENT ⬇️
+    foreach (var item in request.Items)
+    {
+        try
+        {
+            using var stockConn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+            using var stockCmd = new SqlCommand("sp_UpdateStockFromPurchase", stockConn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+            
+            stockCmd.Parameters.AddWithValue("@PurchaseId", purchaseId);
+            stockCmd.Parameters.AddWithValue("@ProductId", item.ProductId);
+            stockCmd.Parameters.AddWithValue("@Quantity", item.Quantity);
+            stockCmd.Parameters.AddWithValue("@Remarks", $"Purchase #{purchaseId}");
+            
+            await stockConn.OpenAsync();
+            using var reader = await stockCmd.ExecuteReaderAsync();
+            
+            if (await reader.ReadAsync())
+            {
+                var success = reader.GetInt32(reader.GetOrdinal("success"));
+                var message = reader.GetString(reader.GetOrdinal("message"));
+                Console.WriteLine($"Stock Update: Success={success}, Message={message}");
+            }
+        }
+        catch (Exception stockEx)
+        {
+            Console.WriteLine($"⚠️ Stock update failed for Product {item.ProductId}: {stockEx.Message}");
+        }
+    }
+    
+    return Results.Ok(new { success = true, purchaseId });
+});
+```
+
+❌ **IF CODE IS MISSING:**
+The stock integration was not properly added. Re-apply the changes from Missing_API_Integration_Prompt.txt
+
+=============================================
+STEP 6: TEST STORED PROCEDURE MANUALLY
+=============================================
+
+Test if sp_UpdateStockFromPurchase works:
+
+```sql
+-- First, ensure stock is initialized
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- Should return 1 row with FilledStock, EmptyStock, DamagedStock
+
+-- Manually test the stored procedure
+EXEC sp_UpdateStockFromPurchase 
+    @PurchaseId = 999,
+    @ProductId = 1,
+    @Quantity = 100,
+    @Remarks = 'Manual Test';
+
+-- Check if stock increased
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- FilledStock should have increased by 100
+
+-- Check if transaction was logged
+SELECT TOP 5 * FROM StockTransactions 
+WHERE ProductId = 1 
+ORDER BY TransactionDate DESC;
+-- Should show new transaction with TransactionType = 'Purchase', FilledChange = 100
+```
+
+✅ **IF SP WORKS:**
+Backend code is not calling it correctly or at all.
+
+❌ **IF SP FAILS:**
+Error message will indicate the issue (e.g., "Invalid object name", "Cannot insert NULL")
+
+=============================================
+STEP 7: VERIFY API IS ACTUALLY BEING CALLED
+=============================================
+
+Add more detailed logging to your Purchase Entry endpoint:
+
+```csharp
+app.MapPost("/api/purchaseentry", async (
+    [FromBody] PurchaseEntryRequest request, 
+    IConfiguration config) =>
+{
+    Console.WriteLine($"🔵 Purchase Entry Started");
+    
+    // ... existing purchase save logic ...
+    
+    int purchaseId = /* get from save */;
+    Console.WriteLine($"🔵 Purchase saved with ID: {purchaseId}");
+    Console.WriteLine($"🔵 Number of items to update stock: {request.Items.Count}");
+    
+    foreach (var item in request.Items)
+    {
+        Console.WriteLine($"🔵 Updating stock for Product {item.ProductId}, Qty {item.Quantity}");
+        
+        try
+        {
+            using var stockConn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+            using var stockCmd = new SqlCommand("sp_UpdateStockFromPurchase", stockConn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+            
+            stockCmd.Parameters.AddWithValue("@PurchaseId", purchaseId);
+            stockCmd.Parameters.AddWithValue("@ProductId", item.ProductId);
+            stockCmd.Parameters.AddWithValue("@Quantity", item.Quantity);
+            stockCmd.Parameters.AddWithValue("@Remarks", $"Purchase #{purchaseId}");
+            
+            Console.WriteLine($"🔵 Opening connection...");
+            await stockConn.OpenAsync();
+            
+            Console.WriteLine($"🔵 Executing sp_UpdateStockFromPurchase...");
+            using var reader = await stockCmd.ExecuteReaderAsync();
+            
+            if (await reader.ReadAsync())
+            {
+                var success = reader.GetInt32(reader.GetOrdinal("success"));
+                var message = reader.GetString(reader.GetOrdinal("message"));
+                
+                if (success == 1)
+                {
+                    Console.WriteLine($"✅ Stock Update SUCCESS: {message}");
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ Stock Update WARNING: {message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"❌ No response from sp_UpdateStockFromPurchase");
+            }
+        }
+        catch (SqlException sqlEx)
+        {
+            Console.WriteLine($"❌ SQL ERROR updating stock for Product {item.ProductId}:");
+            Console.WriteLine($"   Error Number: {sqlEx.Number}");
+            Console.WriteLine($"   Error Message: {sqlEx.Message}");
+            Console.WriteLine($"   Procedure: {sqlEx.Procedure}");
+        }
+        catch (Exception stockEx)
+        {
+            Console.WriteLine($"❌ GENERAL ERROR updating stock for Product {item.ProductId}:");
+            Console.WriteLine($"   {stockEx.Message}");
+            Console.WriteLine($"   Stack Trace: {stockEx.StackTrace}");
+        }
+    }
+    
+    Console.WriteLine($"🔵 Purchase Entry Completed");
+    return Results.Ok(new { success = true, purchaseId });
+});
+```
+
+Watch the console when creating a purchase entry. This will tell you exactly where it's failing.
+
+=============================================
+STEP 8: CHECK FRONTEND IS SENDING CORRECT DATA
+=============================================
+
+Verify your Angular purchase entry form is sending data correctly:
+
+Open browser DevTools (F12) → Network tab
+
+When you save a purchase entry, check the request:
+
+**Request URL:**
+```
+POST https://localhost:7183/api/purchaseentry
+```
+
+**Request Payload:**
+```json
+{
+  "purchaseDate": "2025-12-26T00:00:00",
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 100,
+      "unitPrice": 500
+    }
+  ]
+}
+```
+
+✅ **VERIFY:**
+- `items` array exists
+- Each item has `productId` (or `ProductId` - check property name)
+- Each item has `quantity` (or `Quantity`)
+
+❌ **COMMON ISSUES:**
+- Property names don't match (backend expects `ProductId`, frontend sends `product_id`)
+- Items array is empty
+- Items are in different structure
+
+=============================================
+STEP 9: CHECK CONNECTION STRING
+=============================================
+
+Verify the connection string in your backend is correct:
+
+**In appsettings.json:**
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=YOUR_SERVER;Database=sandhyaflames;Trusted_Connection=True;TrustServerCertificate=True;"
+  }
+}
+```
+
+**Test in code:**
+```csharp
+app.MapGet("/test-connection", async (IConfiguration config) =>
+{
+    var connString = config.GetConnectionString("DefaultConnection");
+    Console.WriteLine($"Connection String: {connString}");
+    
+    try
+    {
+        using var conn = new SqlConnection(connString);
+        await conn.OpenAsync();
+        
+        // Test if StockRegister table exists
+        using var cmd = new SqlCommand("SELECT COUNT(*) FROM StockRegister", conn);
+        var count = (int)await cmd.ExecuteScalarAsync();
+        
+        return Results.Ok(new { 
+            success = true, 
+            message = $"Connected successfully. StockRegister has {count} records." 
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { 
+            success = false, 
+            error = ex.Message 
+        }, statusCode: 500);
+    }
+});
+```
+
+Call: `GET https://localhost:7183/test-connection`
+
+=============================================
+STEP 10: VERIFY STOCK REGISTER UI
+=============================================
+
+Even if stock IS updating in the database, the UI might not be showing it.
+
+**Check Angular Service:**
+Open: src/app/services/stock-register.service.ts
+
+```typescript
+getStockRegister(filters?: any): Observable<StockRegisterItem[]> {
+  const params = new HttpParams({ fromObject: filters || {} });
+  return this.http.get<StockRegisterItem[]>(`${this.apiUrl}/stockregister`, { params });
+}
+```
+
+**Check Component:**
+Open: src/app/views/stock-register/stock-register.component.ts
+
+```typescript
+ngOnInit() {
+  this.loadStock();
+}
+
+loadStock() {
+  this.stockSvc.getStockRegister().subscribe({
+    next: (data) => {
+      console.log('Stock data received:', data); // ADD THIS LOG
+      this.stockItems.set(data);
+    },
+    error: (err) => {
+      console.error('Error loading stock:', err); // ADD THIS LOG
+    }
+  });
+}
+```
+
+**Test UI:**
+1. Open browser console (F12)
+2. Navigate to Stock Register page
+3. Check console for logs
+4. Check Network tab for API call
+5. Verify response has data
+
+=============================================
+QUICK DIAGNOSTIC SQL QUERIES
+=============================================
+
+Run these queries to check current state:
+
+```sql
+-- 1. Check if stock records exist
+SELECT COUNT(*) as StockRecordCount FROM StockRegister;
+
+-- 2. Check if any stock has values > 0
+SELECT * FROM StockRegister 
+WHERE FilledStock > 0 OR EmptyStock > 0 OR DamagedStock > 0;
+
+-- 3. Check all transactions
+SELECT 
+    st.TransactionId,
+    st.TransactionDate,
+    p.ProductName,
+    st.TransactionType,
+    st.FilledChange,
+    st.EmptyChange,
+    st.DamagedChange,
+    st.ReferenceId,
+    st.Remarks
+FROM StockTransactions st
+LEFT JOIN Products p ON st.ProductId = p.ProductId
+ORDER BY st.TransactionDate DESC;
+
+-- 4. Check if recent purchases have stock transactions
+SELECT 
+    pe.PurchaseId,
+    pe.PurchaseDate,
+    COUNT(st.TransactionId) as StockTransactionsCount
+FROM PurchaseEntry pe
+LEFT JOIN StockTransactions st ON st.ReferenceId = pe.PurchaseId AND st.ReferenceType = 'Purchase'
+GROUP BY pe.PurchaseId, pe.PurchaseDate
+ORDER BY pe.PurchaseDate DESC;
+-- If StockTransactionsCount = 0 for recent purchases, stock update is not happening
+
+-- 5. View specific product stock status
+DECLARE @ProductId INT = 1; -- Change this to your product ID
+
+SELECT 
+    p.ProductName,
+    sr.FilledStock,
+    sr.EmptyStock,
+    sr.DamagedStock,
+    sr.LastUpdated,
+    sr.UpdatedBy,
+    (SELECT COUNT(*) FROM StockTransactions WHERE ProductId = @ProductId) as TotalTransactions,
+    (SELECT SUM(FilledChange) FROM StockTransactions WHERE ProductId = @ProductId) as TotalFilledChanges
+FROM Products p
+LEFT JOIN StockRegister sr ON p.ProductId = sr.ProductId
+WHERE p.ProductId = @ProductId;
+```
+
+=============================================
+COMMON ROOT CAUSES & SOLUTIONS
+=============================================
+
+ISSUE 1: "Stock shows 0 even though I created purchases"
+CAUSE: Stock was not initialized before creating purchases
+SOLUTION:
+1. Run: POST /api/stockregister/initialize
+2. Stock is now initialized but past purchases are not recorded
+3. Either:
+   - Manually adjust stock: POST /api/stockregister/adjust
+   - Or re-save old purchases to trigger stock update
+
+ISSUE 2: "Console shows no stock update messages"
+CAUSE: Stock update code was not added to Purchase Entry endpoint
+SOLUTION: Re-apply the integration code from Missing_API_Integration_Prompt.txt
+
+ISSUE 3: "Console shows 'Invalid object name StockRegister'"
+CAUSE: Database tables don't exist
+SOLUTION: Execute sp_StockRegister.sql in SSMS
+
+ISSUE 4: "Console shows 'Could not find stored procedure sp_UpdateStockFromPurchase'"
+CAUSE: Stored procedures not created
+SOLUTION: Execute sp_StockRegister.sql in SSMS (it contains all SP definitions)
+
+ISSUE 5: "Property 'ProductId' does not exist on type"
+CAUSE: Request model property name mismatch
+SOLUTION: Adjust code to match your actual property names:
+- Change `item.ProductId` to `item.Product_Id` (or whatever your property is)
+- Change `item.Quantity` to `item.Qty` (or whatever your property is)
+
+ISSUE 6: "Stock updates but UI doesn't show it"
+CAUSE: Angular service not calling API or not refreshing
+SOLUTION:
+- Check browser Network tab for API calls
+- Add console.log in service subscribe
+- Manually refresh the page
+- Check CORS settings
+
+ISSUE 7: "Items array is empty in backend"
+CAUSE: Frontend sending wrong property name
+SOLUTION: 
+- Check Network tab request payload
+- Backend expects `Items` but frontend sends `items` (or vice versa)
+- Add [FromBody] attribute and check case sensitivity
+
+=============================================
+ULTIMATE TEST PROCEDURE
+=============================================
+
+Follow this exact sequence:
+
+**1. Reset Everything (Fresh Start)**
+```sql
+-- Delete existing stock data
+TRUNCATE TABLE StockTransactions;
+DELETE FROM StockRegister;
+```
+
+**2. Initialize Stock**
+```
+POST /api/stockregister/initialize
+```
+
+**3. Verify Initialization**
+```sql
+SELECT COUNT(*) FROM StockRegister;
+-- Should be > 0
+
+SELECT TOP 5 * FROM StockRegister;
+-- All should have FilledStock = 0, EmptyStock = 0, DamagedStock = 0
+```
+
+**4. Create a Simple Purchase Entry**
+Create purchase with:
+- 1 product
+- Quantity: 100
+
+**5. Check Backend Console Immediately**
+Should see:
+```
+🔵 Purchase Entry Started
+🔵 Purchase saved with ID: 123
+🔵 Number of items to update stock: 1
+🔵 Updating stock for Product 1, Qty 100
+🔵 Opening connection...
+🔵 Executing sp_UpdateStockFromPurchase...
+✅ Stock Update SUCCESS: Stock increased by 100 units
+🔵 Purchase Entry Completed
+```
+
+**6. Verify in Database**
+```sql
+-- Check stock increased
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- FilledStock should be 100
+
+-- Check transaction logged
+SELECT * FROM StockTransactions WHERE ReferenceType = 'Purchase';
+-- Should have 1 record
+```
+
+**7. Check UI**
+- Navigate to Stock Register page
+- Product should show FilledStock = 100
+- If not, check browser console and Network tab
+
+=============================================
+IF STILL NOT WORKING - PROVIDE THIS INFO
+=============================================
+
+If stock is still not working after all these steps, collect this information:
+
+1. **Backend Console Output** (copy the full log when creating purchase)
+
+2. **SQL Query Results:**
+```sql
+SELECT COUNT(*) FROM StockRegister;
+SELECT COUNT(*) FROM StockTransactions;
+SELECT * FROM sys.procedures WHERE name LIKE 'sp_%Stock%';
+```
+
+3. **Network Tab Data:**
+- POST /api/purchaseentry request payload
+- POST /api/purchaseentry response
+
+4. **Code Snippet:**
+- Your actual Purchase Entry endpoint code (first 50 lines)
+
+5. **Error Messages:**
+- Any SQL errors
+- Any console errors
+- Any browser console errors
+
+This will help identify the exact issue.
+
+=============================================
+SUCCESS CRITERIA
+=============================================
+
+Stock integration is working correctly when:
+
+✅ POST /api/stockregister/initialize returns success
+✅ Creating purchase shows "Stock Update SUCCESS" in console
+✅ SQL query shows FilledStock increased in StockRegister table
+✅ SQL query shows new record in StockTransactions table
+✅ Stock Register UI page displays the increased stock
+✅ Creating delivery decreases FilledStock
+✅ Closing delivery increases EmptyStock/DamagedStock
+
+All 7 criteria must be met for complete integration.

@@ -1,0 +1,425 @@
+═══════════════════════════════════════════════════════════════════════════════
+🎯 BACKEND API IMPLEMENTATION TASK - DAILY DELIVERY ITEM ACTUALS
+═══════════════════════════════════════════════════════════════════════════════
+
+CONTEXT:
+--------
+We have an existing .NET Core Web API for a gas agency management system. The DailyDeliveryController currently handles delivery creation and basic CRUD operations. We need to add item-level tracking functionality to track which specific products were delivered vs pending, instead of just consolidated totals.
+
+The database stored procedures are already created and tested. Now we need the API endpoints.
+
+TASK:
+-----
+Add 5 new endpoints to the existing DailyDeliveryController.cs to support item-level delivery tracking.
+
+LOCATION:
+---------
+File: Controllers/DailyDeliveryController.cs (existing file)
+Database: sandhyaflames
+Stored Procedures: Already created (sp_InitializeDeliveryItemActuals, sp_GetDeliveryItemActuals, sp_UpdateDeliveryItemActuals, sp_GetDeliveryWithItemActuals, sp_CloseDeliveryWithItemActuals)
+
+REQUIREMENTS:
+-------------
+1. Follow the existing code pattern in DailyDeliveryController.cs
+2. Use async/await for all database operations
+3. Use SqlConnection and SqlCommand (ADO.NET pattern already in use)
+4. Use System.Text.Json for JSON serialization
+5. Return appropriate HTTP status codes (200, 400, 404, 500)
+6. Handle nullable fields properly
+7. Add proper error handling with try-catch blocks
+
+STEP 1: ADD MODEL CLASSES
+--------------------------
+Add these classes to the controller file or create a new Models/DailyDeliveryItemModels.cs file:
+
+```csharp
+public class ItemActualDto
+{
+    public int ActualId { get; set; }
+    public int DeliveryId { get; set; }
+    public int ProductId { get; set; }
+    public string ProductName { get; set; }
+    public string CategoryName { get; set; }
+    public int PlannedQuantity { get; set; }
+    public int DeliveredQuantity { get; set; }
+    public int PendingQuantity { get; set; }
+    public decimal CashCollected { get; set; }
+    public string ItemStatus { get; set; }
+    public string? Remarks { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal TotalAmount { get; set; }
+}
+
+public class UpdateItemActualsRequest
+{
+    public List<ItemActualInput> Items { get; set; }
+}
+
+public class ItemActualInput
+{
+    public int ProductId { get; set; }
+    public int Delivered { get; set; }
+    public int Pending { get; set; }
+    public decimal CashCollected { get; set; }
+    public string? Remarks { get; set; }
+}
+
+public class CloseDeliveryWithItemsRequest
+{
+    public string ReturnTime { get; set; }
+    public int EmptyCylindersReturned { get; set; }
+    public string? Remarks { get; set; }
+}
+```
+
+STEP 2: ADD USING STATEMENTS
+-----------------------------
+Ensure these using statements are at the top of the controller file:
+
+```csharp
+using Microsoft.Data.SqlClient;  // or System.Data.SqlClient depending on your version
+using System.Data;
+using System.Text.Json;
+```
+
+STEP 3: ADD ENDPOINT 1 - INITIALIZE ITEM ACTUALS
+-------------------------------------------------
+Add this method inside the DailyDeliveryController class:
+
+```csharp
+/// <summary>
+/// Initialize item-level actuals for a delivery
+/// </summary>
+[HttpPost("{deliveryId}/items/initialize")]
+public async Task<IActionResult> InitializeItemActuals(int deliveryId)
+{
+    try
+    {
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand("sp_InitializeDeliveryItemActuals", conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        if (reader.Read())
+        {
+            return Ok(new
+            {
+                success = reader.GetInt32(0),
+                message = reader.GetString(1)
+            });
+        }
+
+        return StatusCode(500, new { message = "Failed to initialize item actuals" });
+    }
+    catch (SqlException ex)
+    {
+        return BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { message = "An error occurred", detail = ex.Message });
+    }
+}
+```
+
+STEP 4: ADD ENDPOINT 2 - GET ITEM ACTUALS
+------------------------------------------
+```csharp
+/// <summary>
+/// Get item-level actuals for a delivery
+/// </summary>
+[HttpGet("{deliveryId}/items/actuals")]
+public async Task<IActionResult> GetItemActuals(int deliveryId)
+{
+    try
+    {
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand("sp_GetDeliveryItemActuals", conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        var items = new List<ItemActualDto>();
+        while (reader.Read())
+        {
+            items.Add(new ItemActualDto
+            {
+                ActualId = reader.GetInt32(reader.GetOrdinal("ActualId")),
+                DeliveryId = reader.GetInt32(reader.GetOrdinal("DeliveryId")),
+                ProductId = reader.GetInt32(reader.GetOrdinal("ProductId")),
+                ProductName = reader.GetString(reader.GetOrdinal("ProductName")),
+                CategoryName = reader.GetString(reader.GetOrdinal("CategoryName")),
+                PlannedQuantity = reader.GetInt32(reader.GetOrdinal("PlannedQuantity")),
+                DeliveredQuantity = reader.GetInt32(reader.GetOrdinal("DeliveredQuantity")),
+                PendingQuantity = reader.GetInt32(reader.GetOrdinal("PendingQuantity")),
+                CashCollected = reader.GetDecimal(reader.GetOrdinal("CashCollected")),
+                ItemStatus = reader.GetString(reader.GetOrdinal("ItemStatus")),
+                Remarks = reader.IsDBNull(reader.GetOrdinal("Remarks")) ? null : reader.GetString(reader.GetOrdinal("Remarks")),
+                UpdatedAt = reader.GetDateTime(reader.GetOrdinal("UpdatedAt")),
+                UnitPrice = reader.GetDecimal(reader.GetOrdinal("UnitPrice")),
+                TotalAmount = reader.GetDecimal(reader.GetOrdinal("TotalAmount"))
+            });
+        }
+
+        return Ok(items);
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { message = "An error occurred", detail = ex.Message });
+    }
+}
+```
+
+STEP 5: ADD ENDPOINT 3 - UPDATE ITEM ACTUALS (BULK)
+----------------------------------------------------
+```csharp
+/// <summary>
+/// Update multiple item actuals in bulk
+/// </summary>
+[HttpPut("{deliveryId}/items/actuals")]
+public async Task<IActionResult> UpdateItemActuals(int deliveryId, [FromBody] UpdateItemActualsRequest request)
+{
+    try
+    {
+        var itemsJson = JsonSerializer.Serialize(request.Items, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand("sp_UpdateDeliveryItemActuals", conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+        cmd.Parameters.AddWithValue("@ItemsJson", itemsJson);
+
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        if (reader.Read())
+        {
+            return Ok(new
+            {
+                success = reader.GetInt32(0),
+                message = reader.GetString(1)
+            });
+        }
+
+        return StatusCode(500, new { message = "Failed to update item actuals" });
+    }
+    catch (SqlException ex)
+    {
+        return BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { message = "An error occurred", detail = ex.Message });
+    }
+}
+```
+
+STEP 6: ADD ENDPOINT 4 - GET DELIVERY WITH ITEMS (MULTIPLE RESULT SETS)
+------------------------------------------------------------------------
+```csharp
+/// <summary>
+/// Get delivery header with item-level actuals (combined view)
+/// </summary>
+[HttpGet("{deliveryId}/with-items")]
+public async Task<IActionResult> GetDeliveryWithItems(int deliveryId)
+{
+    try
+    {
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand("sp_GetDeliveryWithItemActuals", conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        // First result set: Delivery header
+        object? delivery = null;
+        if (reader.Read())
+        {
+            delivery = new
+            {
+                deliveryId = reader.GetInt32(reader.GetOrdinal("DeliveryId")),
+                deliveryDate = reader.GetDateTime(reader.GetOrdinal("DeliveryDate")),
+                vehicleId = reader.GetInt32(reader.GetOrdinal("VehicleId")),
+                vehicleNumber = reader.GetString(reader.GetOrdinal("VehicleNumber")),
+                status = reader.GetString(reader.GetOrdinal("Status")),
+                returnTime = reader.IsDBNull(reader.GetOrdinal("ReturnTime")) ? null : reader.GetTimeSpan(reader.GetOrdinal("ReturnTime")).ToString(),
+                remarks = reader.IsDBNull(reader.GetOrdinal("Remarks")) ? null : reader.GetString(reader.GetOrdinal("Remarks")),
+                completedInvoices = reader.GetInt32(reader.GetOrdinal("CompletedInvoices")),
+                pendingInvoices = reader.GetInt32(reader.GetOrdinal("PendingInvoices")),
+                cashCollected = reader.GetDecimal(reader.GetOrdinal("CashCollected")),
+                emptyCylindersReturned = reader.GetInt32(reader.GetOrdinal("EmptyCylindersReturned"))
+            };
+        }
+
+        // Move to second result set: Items
+        await reader.NextResultAsync();
+        var items = new List<ItemActualDto>();
+        while (reader.Read())
+        {
+            items.Add(new ItemActualDto
+            {
+                ActualId = reader.GetInt32(reader.GetOrdinal("ActualId")),
+                DeliveryId = reader.GetInt32(reader.GetOrdinal("DeliveryId")),
+                ProductId = reader.GetInt32(reader.GetOrdinal("ProductId")),
+                ProductName = reader.GetString(reader.GetOrdinal("ProductName")),
+                CategoryName = reader.GetString(reader.GetOrdinal("CategoryName")),
+                PlannedQuantity = reader.GetInt32(reader.GetOrdinal("PlannedQuantity")),
+                DeliveredQuantity = reader.GetInt32(reader.GetOrdinal("DeliveredQuantity")),
+                PendingQuantity = reader.GetInt32(reader.GetOrdinal("PendingQuantity")),
+                CashCollected = reader.GetDecimal(reader.GetOrdinal("CashCollected")),
+                ItemStatus = reader.GetString(reader.GetOrdinal("ItemStatus")),
+                Remarks = reader.IsDBNull(reader.GetOrdinal("Remarks")) ? null : reader.GetString(reader.GetOrdinal("Remarks")),
+                UpdatedAt = reader.GetDateTime(reader.GetOrdinal("UpdatedAt")),
+                UnitPrice = reader.GetDecimal(reader.GetOrdinal("UnitPrice")),
+                TotalAmount = reader.GetDecimal(reader.GetOrdinal("TotalAmount"))
+            });
+        }
+
+        if (delivery == null)
+        {
+            return NotFound(new { message = "Delivery not found" });
+        }
+
+        return Ok(new { delivery, items });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { message = "An error occurred", detail = ex.Message });
+    }
+}
+```
+
+STEP 7: ADD ENDPOINT 5 - CLOSE DELIVERY WITH ITEM VERIFICATION
+---------------------------------------------------------------
+```csharp
+/// <summary>
+/// Close a delivery with item verification
+/// </summary>
+[HttpPut("{deliveryId}/close-with-items")]
+public async Task<IActionResult> CloseDeliveryWithItems(int deliveryId, [FromBody] CloseDeliveryWithItemsRequest request)
+{
+    try
+    {
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand("sp_CloseDeliveryWithItemActuals", conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+        cmd.Parameters.AddWithValue("@ReturnTime", TimeSpan.Parse(request.ReturnTime));
+        cmd.Parameters.AddWithValue("@EmptyCylindersReturned", request.EmptyCylindersReturned);
+        cmd.Parameters.AddWithValue("@Remarks", (object?)request.Remarks ?? DBNull.Value);
+
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        if (reader.Read())
+        {
+            return Ok(new
+            {
+                success = reader.GetInt32(0),
+                message = reader.GetString(1)
+            });
+        }
+
+        return StatusCode(500, new { message = "Failed to close delivery" });
+    }
+    catch (SqlException ex)
+    {
+        return BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { message = "An error occurred", detail = ex.Message });
+    }
+}
+```
+
+TESTING INSTRUCTIONS:
+---------------------
+1. Build the project and ensure no compilation errors
+2. Run the API application
+3. Open Swagger UI (typically https://localhost:7183/swagger)
+4. Verify all 5 new endpoints appear under DailyDelivery section:
+   - POST /api/dailydelivery/{deliveryId}/items/initialize
+   - GET /api/dailydelivery/{deliveryId}/items/actuals
+   - PUT /api/dailydelivery/{deliveryId}/items/actuals
+   - GET /api/dailydelivery/{deliveryId}/with-items
+   - PUT /api/dailydelivery/{deliveryId}/close-with-items
+
+5. Test the workflow with an existing delivery (e.g., DeliveryId = 24):
+
+   a) Initialize items:
+      POST /api/dailydelivery/24/items/initialize
+      Expected: { "success": 1, "message": "Item actuals initialized" }
+
+   b) Get items:
+      GET /api/dailydelivery/24/items/actuals
+      Expected: Array of items with planned/delivered/pending quantities
+
+   c) Update items:
+      PUT /api/dailydelivery/24/items/actuals
+      Body:
+      {
+        "items": [
+          {
+            "productId": 2,
+            "delivered": 8,
+            "pending": 2,
+            "cashCollected": 4000,
+            "remarks": "Test update"
+          }
+        ]
+      }
+      Expected: { "success": 1, "message": "Item actuals updated successfully" }
+
+   d) Get delivery with items:
+      GET /api/dailydelivery/24/with-items
+      Expected: { "delivery": {...}, "items": [...] }
+
+   e) Close delivery:
+      PUT /api/dailydelivery/24/close-with-items
+      Body:
+      {
+        "returnTime": "18:30:00",
+        "emptyCylindersReturned": 10,
+        "remarks": "Completed"
+      }
+      Expected: { "success": 1, "message": "Delivery closed successfully" }
+
+IMPORTANT NOTES:
+----------------
+- The _connectionString field should already exist in your DailyDeliveryController
+- All stored procedures are already created in the database
+- These endpoints do NOT modify existing functionality
+- Existing endpoints continue to work as before
+- The frontend Angular application is already updated to call these endpoints
+
+VERIFICATION:
+-------------
+After implementation, check:
+✓ All 5 endpoints compile without errors
+✓ Swagger documentation shows all endpoints with proper descriptions
+✓ Initialize creates records in DailyDeliveryItemActuals table
+✓ GET actuals returns correct data
+✓ PUT actuals updates the database
+✓ Close delivery sets Status = 'Closed' in DailyDelivery table
+✓ No errors in console or Swagger UI
+
+DELIVERABLES:
+-------------
+1. Updated DailyDeliveryController.cs with 5 new endpoint methods
+2. Model classes added (either in controller or separate file)
+3. Confirmed all endpoints appear in Swagger
+4. Basic testing completed (at least one successful call to each endpoint)
+
+═══════════════════════════════════════════════════════════════════════════════

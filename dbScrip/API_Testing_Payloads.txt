@@ -1,0 +1,490 @@
+=============================================
+BACKEND API TESTING PAYLOADS
+Test Stock Integration via Swagger
+=============================================
+
+TESTING SEQUENCE:
+1. Initialize Stock (one-time)
+2. Test Purchase Entry → Adds filled stock
+3. Test Daily Delivery Create → Deducts filled stock
+4. Test Daily Delivery Close → Adds empty/damaged stock
+
+=============================================
+STEP 1: INITIALIZE STOCK REGISTER
+=============================================
+
+ENDPOINT: POST /api/stockregister/initialize
+METHOD: POST
+BODY: None (empty)
+
+EXPECTED RESPONSE:
+```json
+{
+  "success": true,
+  "message": "Initialized stock for 11 products",
+  "initializedCount": 11
+}
+```
+
+VERIFY IN SQL:
+```sql
+SELECT * FROM StockRegister;
+-- Should show 11 records with all stock = 0
+```
+
+=============================================
+STEP 2: TEST MANUAL STOCK ADJUSTMENT
+=============================================
+
+ENDPOINT: POST /api/stockregister/adjust
+METHOD: POST
+CONTENT-TYPE: application/json
+
+PAYLOAD:
+```json
+{
+  "productId": 1,
+  "filledChange": 1000,
+  "emptyChange": 0,
+  "damagedChange": 0,
+  "remarks": "Initial stock entry for testing",
+  "adjustedBy": "Admin"
+}
+```
+
+EXPECTED RESPONSE:
+```json
+{
+  "success": true,
+  "message": "Stock adjusted successfully"
+}
+```
+
+VERIFY IN SQL:
+```sql
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- FilledStock should be 1000
+
+SELECT * FROM StockTransactions WHERE ProductId = 1;
+-- Should show transaction with TransactionType = 'Adjustment'
+```
+
+=============================================
+STEP 3: TEST PURCHASE ENTRY WITH STOCK UPDATE
+=============================================
+
+NOTE: This tests if Purchase Entry endpoint calls sp_UpdateStockFromPurchase
+
+ENDPOINT: POST /api/purchases
+METHOD: POST
+CONTENT-TYPE: application/json
+
+PAYLOAD:
+```json
+{
+  "purchaseId": 0,
+  "vendorId": 1,
+  "invoiceNo": "TEST-001",
+  "purchaseDate": "2025-12-26T00:00:00",
+  "remarks": "Test purchase for stock integration",
+  "isActive": true,
+  "items": [
+    {
+      "productId": 1,
+      "categoryId": 1,
+      "subCategoryId": 1,
+      "qty": 100,
+      "unitPrice": 500
+    }
+  ]
+}
+```
+
+EXPECTED RESPONSE:
+```json
+{
+  "success": true,
+  "purchaseId": 123
+}
+```
+
+CHECK BACKEND CONSOLE:
+```
+✅ Stock updated for Product 1: Stock increased by 100 units
+```
+
+VERIFY IN SQL:
+```sql
+-- Check stock increased
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- FilledStock should be 1100 (1000 + 100)
+
+-- Check transaction logged
+SELECT * FROM StockTransactions 
+WHERE ProductId = 1 AND TransactionType = 'Purchase'
+ORDER BY TransactionDate DESC;
+-- Should show FilledChange = 100, ReferenceType = 'Purchase'
+```
+
+=============================================
+STEP 4: TEST DAILY DELIVERY CREATION WITH STOCK DEDUCTION
+=============================================
+
+NOTE: This tests if Daily Delivery endpoint calls sp_UpdateStockFromDeliveryAssignment
+
+ENDPOINT: POST /api/dailydelivery
+METHOD: POST
+CONTENT-TYPE: application/json
+
+PAYLOAD:
+```json
+{
+  "deliveryDate": "2025-12-26",
+  "driverId": 1,
+  "startTime": "09:00:00",
+  "returnTime": null,
+  "remarks": "Test delivery for stock integration",
+  "items": [
+    {
+      "productId": 1,
+      "noOfCylinders": 50,
+      "noOfInvoices": 10,
+      "noOfItems": null
+    }
+  ]
+}
+```
+
+EXPECTED RESPONSE:
+```json
+{
+  "success": true,
+  "deliveryId": 456
+}
+```
+
+CHECK BACKEND CONSOLE:
+```
+✅ Stock deducted for Delivery 456: Stock decreased by 50 units
+```
+
+VERIFY IN SQL:
+```sql
+-- Check stock decreased
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- FilledStock should be 1050 (1100 - 50)
+
+-- Check transaction logged
+SELECT * FROM StockTransactions 
+WHERE ProductId = 1 AND TransactionType = 'DeliveryAssigned'
+ORDER BY TransactionDate DESC;
+-- Should show FilledChange = -50, ReferenceId = 456, ReferenceType = 'Delivery'
+```
+
+=============================================
+STEP 5: UPDATE DELIVERY ITEM ACTUALS (BEFORE CLOSING)
+=============================================
+
+NOTE: This is needed to record what was actually delivered and returned
+
+ENDPOINT: POST /api/dailydelivery/item-actuals
+METHOD: POST
+CONTENT-TYPE: application/json
+
+PAYLOAD:
+```json
+{
+  "deliveryId": 456,
+  "items": [
+    {
+      "productId": 1,
+      "delivered": 48,
+      "pending": 2,
+      "emptyReturned": 45,
+      "damagedReturned": 3,
+      "cashCollected": 24000,
+      "remarks": "2 cylinders not delivered, 3 damaged returns"
+    }
+  ]
+}
+```
+
+EXPECTED RESPONSE:
+```json
+{
+  "success": true,
+  "message": "Delivery item actuals updated"
+}
+```
+
+VERIFY IN SQL:
+```sql
+SELECT * FROM DailyDeliveryItemActuals WHERE DeliveryId = 456;
+-- Should show: DeliveredQuantity = 48, EmptyReturned = 45, DamagedReturned = 3
+```
+
+=============================================
+STEP 6: TEST DAILY DELIVERY CLOSE WITH STOCK RETURN
+=============================================
+
+NOTE: This tests if Close Delivery endpoint calls sp_UpdateStockFromDeliveryReturn
+
+ENDPOINT: POST /api/dailydelivery/close/{deliveryId}
+METHOD: POST
+CONTENT-TYPE: application/json
+
+URL: POST /api/dailydelivery/close/456
+
+PAYLOAD OPTION 1 (if your endpoint accepts body):
+```json
+{
+  "emptyCylindersReturned": 45,
+  "damagedCylinders": 3
+}
+```
+
+PAYLOAD OPTION 2 (if endpoint reads from DailyDeliveryItemActuals):
+No body needed - it will automatically sum from DailyDeliveryItemActuals
+
+EXPECTED RESPONSE:
+```json
+{
+  "success": true
+}
+```
+
+CHECK BACKEND CONSOLE:
+```
+📊 Delivery 456 returns - Empty: 45, Damaged: 3
+✅ Stock return updated for Delivery 456: Stock updated with returns
+```
+
+VERIFY IN SQL:
+```sql
+-- Check stock return updated
+SELECT * FROM StockRegister WHERE ProductId = 1;
+-- FilledStock: 1050 (unchanged)
+-- EmptyStock: 45
+-- DamagedStock: 3
+-- TotalStock: 1098 (1050 + 45 + 3)
+
+-- Check transaction logged
+SELECT * FROM StockTransactions 
+WHERE ProductId = 1 AND TransactionType = 'DeliveryCompleted'
+ORDER BY TransactionDate DESC;
+-- Should show EmptyChange = 45, DamagedChange = 3, ReferenceId = 456
+```
+
+=============================================
+STEP 7: VIEW STOCK REGISTER (FINAL STATE)
+=============================================
+
+ENDPOINT: GET /api/stockregister
+METHOD: GET
+QUERY PARAMS: None (or ?productId=1 to filter)
+
+EXPECTED RESPONSE:
+```json
+[
+  {
+    "stockId": 1,
+    "productId": 1,
+    "productName": "14.2KG LPG Cylinder",
+    "categoryName": "Cylinder",
+    "subCategoryName": "Commercial",
+    "filledStock": 1050,
+    "emptyStock": 45,
+    "damagedStock": 3,
+    "totalStock": 1098,
+    "lastUpdated": "2025-12-26T12:30:00",
+    "updatedBy": "DeliveryReturn"
+  }
+]
+```
+
+=============================================
+STEP 8: VIEW TRANSACTION HISTORY
+=============================================
+
+ENDPOINT: GET /api/stockregister/transactions
+METHOD: GET
+QUERY PARAMS: ?productId=1
+
+EXPECTED RESPONSE:
+```json
+[
+  {
+    "transactionId": 4,
+    "productId": 1,
+    "productName": "14.2KG LPG Cylinder",
+    "transactionType": "DeliveryCompleted",
+    "filledChange": 0,
+    "emptyChange": 45,
+    "damagedChange": 3,
+    "referenceId": 456,
+    "referenceType": "Delivery",
+    "remarks": null,
+    "transactionDate": "2025-12-26T12:30:00",
+    "createdBy": "System"
+  },
+  {
+    "transactionId": 3,
+    "productId": 1,
+    "productName": "14.2KG LPG Cylinder",
+    "transactionType": "DeliveryAssigned",
+    "filledChange": -50,
+    "emptyChange": 0,
+    "damagedChange": 0,
+    "referenceId": 456,
+    "referenceType": "Delivery",
+    "remarks": "Assigned to vehicle",
+    "transactionDate": "2025-12-26T10:00:00",
+    "createdBy": "System"
+  },
+  {
+    "transactionId": 2,
+    "productId": 1,
+    "productName": "14.2KG LPG Cylinder",
+    "transactionType": "Purchase",
+    "filledChange": 100,
+    "emptyChange": 0,
+    "damagedChange": 0,
+    "referenceId": 123,
+    "referenceType": "Purchase",
+    "remarks": "Purchase Entry #123",
+    "transactionDate": "2025-12-26T09:00:00",
+    "createdBy": "System"
+  },
+  {
+    "transactionId": 1,
+    "productId": 1,
+    "productName": "14.2KG LPG Cylinder",
+    "transactionType": "Adjustment",
+    "filledChange": 1000,
+    "emptyChange": 0,
+    "damagedChange": 0,
+    "referenceId": null,
+    "referenceType": "Manual",
+    "remarks": "Initial stock entry for testing",
+    "transactionDate": "2025-12-26T08:00:00",
+    "createdBy": "Admin"
+  }
+]
+```
+
+=============================================
+COMPLETE WORKFLOW SUMMARY
+=============================================
+
+STARTING STATE (after initialization):
+- FilledStock: 0
+- EmptyStock: 0
+- DamagedStock: 0
+
+AFTER MANUAL ADJUSTMENT (+1000):
+- FilledStock: 1000
+- EmptyStock: 0
+- DamagedStock: 0
+
+AFTER PURCHASE ENTRY (+100):
+- FilledStock: 1100 (1000 + 100)
+- EmptyStock: 0
+- DamagedStock: 0
+
+AFTER DELIVERY CREATED (-50):
+- FilledStock: 1050 (1100 - 50)
+- EmptyStock: 0
+- DamagedStock: 0
+
+AFTER DELIVERY CLOSED (+45 empty, +3 damaged):
+- FilledStock: 1050 (unchanged)
+- EmptyStock: 45
+- DamagedStock: 3
+- TotalStock: 1098 ✅
+
+ALL CYLINDERS ACCOUNTED FOR:
+Initial: 1000 + Purchase: 100 - Delivered: 50 + Returned: 48 = 1098 ✅
+
+=============================================
+TROUBLESHOOTING TIPS
+=============================================
+
+IF STOCK DOESN'T UPDATE AFTER PURCHASE:
+1. Check backend console for "Stock updated" message
+2. If no message, stock update code not added to Purchase Entry endpoint
+3. Check SQL: SELECT * FROM StockTransactions - if empty, integration not working
+
+IF STOCK DOESN'T DEDUCT AFTER DELIVERY:
+1. Check backend console for "Stock deducted" message
+2. Verify DailyDeliveryItems table has records for the delivery
+3. sp_UpdateStockFromDeliveryAssignment reads from DailyDeliveryItems
+
+IF STOCK DOESN'T UPDATE AFTER DELIVERY CLOSE:
+1. Check if DailyDeliveryItemActuals has records
+2. Backend should calculate totals from that table
+3. Or pass empty/damaged counts in request body
+
+IF "Cannot find stored procedure":
+1. Execute sp_StockRegister.sql in SQL Server
+2. Verify all SPs exist: SELECT name FROM sys.procedures WHERE name LIKE 'sp_%Stock%'
+
+IF NEGATIVE STOCK:
+1. You tried to deduct more than available
+2. Manually adjust: POST /api/stockregister/adjust with positive FilledChange
+
+=============================================
+SQL VERIFICATION QUERIES
+=============================================
+
+-- Summary of all stock
+SELECT 
+    p.ProductName,
+    ISNULL(sr.FilledStock, 0) as Filled,
+    ISNULL(sr.EmptyStock, 0) as Empty,
+    ISNULL(sr.DamagedStock, 0) as Damaged,
+    ISNULL(sr.FilledStock, 0) + ISNULL(sr.EmptyStock, 0) + ISNULL(sr.DamagedStock, 0) as Total
+FROM Products p
+LEFT JOIN StockRegister sr ON p.ProductId = sr.ProductId
+WHERE p.IsActive = 1
+ORDER BY p.ProductName;
+
+-- All transactions for Product ID 1
+SELECT 
+    st.TransactionDate,
+    st.TransactionType,
+    st.FilledChange,
+    st.EmptyChange,
+    st.DamagedChange,
+    st.ReferenceType,
+    st.ReferenceId,
+    st.Remarks
+FROM StockTransactions st
+WHERE st.ProductId = 1
+ORDER BY st.TransactionDate;
+
+-- Verify stock balance
+SELECT 
+    p.ProductName,
+    (SELECT ISNULL(SUM(FilledChange), 0) FROM StockTransactions WHERE ProductId = 1) as CalculatedFilled,
+    sr.FilledStock as ActualFilled,
+    (SELECT ISNULL(SUM(EmptyChange), 0) FROM StockTransactions WHERE ProductId = 1) as CalculatedEmpty,
+    sr.EmptyStock as ActualEmpty
+FROM Products p
+LEFT JOIN StockRegister sr ON p.ProductId = sr.ProductId
+WHERE p.ProductId = 1;
+-- CalculatedFilled should match ActualFilled
+
+=============================================
+FINAL VALIDATION
+=============================================
+
+✅ Stock initialized
+✅ Manual adjustment works
+✅ Purchase entry increases filled stock
+✅ Delivery creation decreases filled stock
+✅ Delivery closure adds empty/damaged stock
+✅ All transactions logged
+✅ Stock balances match transaction totals
+✅ UI displays correct stock levels
+
+When all checklist items pass, stock integration is fully working!

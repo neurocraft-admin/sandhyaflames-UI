@@ -1,0 +1,221 @@
+// ===============================================
+// Commercial Delivery Management - API Specification
+// ===============================================
+// This document specifies the required API endpoints for managing
+// commercial deliveries with credit customers.
+//
+// Backend: .NET Core Web API
+// Database: SQL Server (sandhyaflames)
+// ===============================================
+
+CONTROLLER: DailyDeliveryController (Enhancement)
+
+// -----------------------------------------------
+// ENDPOINT 1: Get All Deliveries (Enhanced)
+// -----------------------------------------------
+// Note: The existing GetDeliverySummary endpoint needs to be updated
+// to include the new HasCreditCustomers field in the response.
+
+Route: GET /api/DailyDelivery
+Response Model (DailyDeliverySummaryDto):
+{
+  "DeliveryId": 1,
+  "DeliveryDate": "2025-12-21",
+  "DriverName": "John Doe",
+  "VehicleId": 5,
+  "VehicleNo": "KA01AB1234",
+  "VehicleNumber": "KA01AB1234",
+  "StartTime": "08:00:00",
+  "ReturnTime": "18:30:00",
+  "Remarks": "Completed successfully",
+  "HasCreditCustomers": true,           // ⭐ NEW FIELD
+  "Status": "Completed",
+  "CompletedInvoices": 15,
+  "PendingInvoices": 2,
+  "CashCollected": 45000.00,
+  "EmptyCylindersReturned": 12,
+  "CylindersDelivered": 15,
+  "NonCylItemsDelivered": 3,
+  "TotalCollection": 48500.00,
+  "TotalItemsDelivered": 18,
+  "DeliveryCompletionRate": 88.24
+}
+
+Stored Procedure: sp_GetDeliverySummary
+Implementation:
+- Updated stored procedure is provided in: dbScrip/sp_UpdateDailyDeliveryForCreditCustomers.sql
+- Includes HasCreditCustomers field in SELECT statement
+- No changes to logic, only adds one more field to output
+
+// -----------------------------------------------
+// ENDPOINT 2: Create Daily Delivery (Enhanced)
+// -----------------------------------------------
+// Note: The existing CreateDailyDelivery endpoint needs to accept
+// the new HasCreditCustomers field in the request.
+
+Route: POST /api/DailyDelivery
+Request Model (CreateDailyDeliveryDto):
+{
+  "DeliveryDate": "2025-12-21",
+  "DriverId": 3,
+  "VehicleId": 5,
+  "StartTime": "08:00:00",
+  "ReturnTime": null,
+  "Remarks": "Morning delivery run",
+  "HasCreditCustomers": true,          // ⭐ NEW FIELD
+  "Items": [
+    {
+      "ProductId": 10,
+      "Quantity": 15,
+      "UnitPrice": 850.00,
+      "Discount": 50.00,
+      "NetAmount": 12700.00
+    }
+  ]
+}
+
+Response:
+{
+  "DeliveryId": 123
+}
+
+Stored Procedure: sp_CreateDailyDelivery
+Parameters:
+  @DeliveryDate DATE
+  @DriverId INT
+  @VehicleId INT
+  @StartTime TIME
+  @ReturnTime TIME = NULL
+  @Remarks NVARCHAR(500) = NULL
+  @HasCreditCustomers BIT = 0          // ⭐ NEW PARAMETER
+  @Items NVARCHAR(MAX)                 // JSON array
+
+Implementation:
+- Updated stored procedure is provided in: dbScrip/sp_UpdateDailyDeliveryForCreditCustomers.sql
+- Inserts HasCreditCustomers value into DailyDelivery table
+- No changes to validation or transaction logic
+
+// -----------------------------------------------
+// ENDPOINT 3: Get Delivery By Id (NEW - Optional but Recommended)
+// -----------------------------------------------
+// This endpoint enables the edit functionality from Commercial Deliveries page
+
+Route: GET /api/DailyDelivery/{id}
+Response Model:
+{
+  "DeliveryId": 123,
+  "DeliveryDate": "2025-12-21",
+  "DriverId": 3,
+  "VehicleId": 5,
+  "StartTime": "08:00:00",
+  "ReturnTime": "18:30:00",
+  "Remarks": "Morning delivery",
+  "HasCreditCustomers": true,
+  "Items": [
+    {
+      "DeliveryItemId": 456,
+      "ProductId": 10,
+      "ProductName": "HP Gas 19kg Commercial",
+      "Quantity": 15,
+      "UnitPrice": 850.00,
+      "Discount": 50.00,
+      "NetAmount": 12700.00
+    }
+  ]
+}
+
+Stored Procedure (Create New): sp_GetDailyDeliveryById
+Parameters:
+  @DeliveryId INT
+
+SQL Implementation:
+CREATE PROCEDURE sp_GetDailyDeliveryById
+    @DeliveryId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Get delivery header
+    SELECT 
+        DeliveryId,
+        DeliveryDate,
+        DriverId,
+        VehicleId,
+        StartTime,
+        ReturnTime,
+        Remarks,
+        HasCreditCustomers
+    FROM DailyDelivery
+    WHERE DeliveryId = @DeliveryId AND IsActive = 1;
+
+    -- Get delivery items
+    SELECT 
+        ddi.DeliveryItemId,
+        ddi.ProductId,
+        p.ProductName,
+        ddi.Quantity,
+        ddi.UnitPrice,
+        ddi.Discount,
+        ddi.NetAmount
+    FROM DailyDeliveryItems ddi
+    INNER JOIN Products p ON ddi.ProductId = p.ProductId
+    WHERE ddi.DeliveryId = @DeliveryId;
+END
+GO
+
+// -----------------------------------------------
+// DATABASE SCHEMA CHANGES
+// -----------------------------------------------
+
+Table: DailyDelivery
+Add Column:
+  HasCreditCustomers BIT NOT NULL DEFAULT 0
+
+Migration Script: dbScrip/sp_UpdateDailyDeliveryForCreditCustomers.sql
+  - Safely adds column if not exists
+  - Sets default value to 0 (false)
+  - Does not affect existing data
+
+// -----------------------------------------------
+// IMPLEMENTATION CHECKLIST
+// -----------------------------------------------
+
+✅ Run migration script: sp_UpdateDailyDeliveryForCreditCustomers.sql
+   - Adds HasCreditCustomers column to DailyDelivery table
+   - Updates sp_CreateDailyDelivery to accept and insert new field
+   - Updates sp_GetDeliverySummary to return new field
+
+✅ Update DailyDeliveryController.cs:
+   1. Add HasCreditCustomers property to CreateDailyDeliveryDto
+   2. Pass @HasCreditCustomers parameter to sp_CreateDailyDelivery
+   3. Add HasCreditCustomers property to DailyDeliverySummaryDto
+   4. Map HasCreditCustomers from sp_GetDeliverySummary result
+
+✅ Optional (for Edit functionality):
+   1. Create sp_GetDailyDeliveryById stored procedure
+   2. Add GET /api/DailyDelivery/{id} endpoint
+   3. Return delivery header + items as nested objects
+
+// -----------------------------------------------
+// FRONTEND INTEGRATION NOTES
+// -----------------------------------------------
+
+Angular Components:
+- DailyDeliveryComponent: Updated to include hasCreditCustomers checkbox
+- CommercialDeliveryListComponent: Filters deliveries where HasCreditCustomers = true
+- DeliveryMappingComponent: Existing component for customer cylinder mapping
+
+Navigation Flow:
+1. User creates delivery with "Has Credit Customers" checked
+2. Delivery appears in "Commercial Deliveries" menu
+3. User clicks "Map Customers" to assign commercial cylinders to customers
+4. User can edit delivery details using "Edit" button
+
+Menu Structure:
+- Daily Delivery (all deliveries)
+  ├─ Commercial Deliveries (filtered: HasCreditCustomers = true)
+  └─ Map Customers (per delivery, from Commercial Deliveries list)
+
+// ===============================================
+// END OF SPECIFICATION
+// ===============================================

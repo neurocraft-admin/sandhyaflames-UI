@@ -1,6 +1,6 @@
 <c-sidebar class="sidebar sidebar-dark bg-dark" visible="true">
   <!-- force visible sidebar -->
-  <c-sidebar-nav [navItems]="sidebarItems"></c-sidebar-nav>
+  <c-sidebar-nav [navItems]="(sidebarItems$ | async) ?? []"></c-sidebar-nav>
 </c-sidebar>
 
 <div class="wrapper d-flex flex-column min-vh-100 bg-light w-100">

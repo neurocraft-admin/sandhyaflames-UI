@@ -1,0 +1,233 @@
+=============================================
+GITHUB COPILOT PROMPT FOR VISUAL STUDIO
+Backend API Implementation - Menu & Permissions
+=============================================
+
+CONTEXT:
+I need to create a new C# file called MenuPermissionRoutes.cs in my .NET Core Minimal API project.
+This file will contain API endpoints for menu and permission management with role-based access control.
+
+DATABASE SCHEMA COMPLETED:
+- Resources table: Contains all pages/features (Dashboard, Users, Products, etc.)
+- MenuItems table: Hierarchical menu structure (parent-child relationships)
+- Permissions table: CRUD permissions per role per resource (CanView, CanCreate, CanUpdate, CanDelete, CanExport, CanApprove)
+- MenuAccess table: Maps which roles can see which menu items
+
+STORED PROCEDURES AVAILABLE:
+1. sp_GetMenuByRole(@RoleId) - Returns hierarchical menu items for a role
+2. sp_GetPermissionsByUserId(@UserId) - Returns all permissions for a user with role info
+3. sp_CheckPermission(@UserId, @ResourceName, @Action) - Checks single permission
+4. sp_UpdateRolePermissions(@RoleId, @ResourceId, @CanView, @CanCreate, @CanUpdate, @CanDelete, @CanExport, @CanApprove)
+5. sp_GetRolesWithPermissions() - Returns all roles with permission summary
+
+REQUIREMENTS:
+Create MenuPermissionRoutes.cs with these 5 API endpoints:
+
+1. GET /api/menu/current-user
+   - Authentication: Required (JWT Bearer)
+   - Gets userId from JWT claims (context.User.FindFirst("UserId")?.Value)
+   - Queries Users table to get user's RoleId
+   - Calls sp_GetMenuByRole with the RoleId
+   - Builds hierarchical menu structure (parent-child relationship)
+   - Returns INavData[] format compatible with CoreUI Angular
+
+2. GET /api/permissions/current-user
+   - Authentication: Required
+   - Gets userId from JWT claims
+   - Calls sp_GetPermissionsByUserId
+   - Uses QueryMultipleAsync to get user info (first result set) and permissions (second result set)
+   - Returns: { userId, username, roleId, roleName, permissions: [...] }
+
+3. GET /api/permissions/check?resource={resourceName}&action={action}
+   - Authentication: Required
+   - Query parameters: resource (string), action (string: View/Create/Update/Delete)
+   - Gets userId from JWT claims
+   - Calls sp_CheckPermission
+   - Returns: { allowed: true/false }
+
+4. PUT /api/permissions/role/{roleId}
+   - Authentication: Required
+   - Authorization: Admin role only (use .RequireAuthorization())
+   - Request body: { resourceId, canView, canCreate, canUpdate, canDelete, canExport, canApprove }
+   - Calls sp_UpdateRolePermissions
+   - Returns: { success: true/false, message: "..." }
+
+5. GET /api/roles/permissions
+   - Authentication: Required
+   - Authorization: Admin role only
+   - Calls sp_GetRolesWithPermissions
+   - Returns array of roles with permission counts
+
+TECHNICAL SPECIFICATIONS:
+
+File Structure:
+```csharp
+using Microsoft.Data.SqlClient;
+using Dapper;
+
+namespace YourNamespace.Routes;
+
+public static class MenuPermissionRoutes
+{
+    public static void MapMenuPermissionEndpoints(this WebApplication app)
+    {
+        // Endpoint 1: GET /api/menu/current-user
+        // Endpoint 2: GET /api/permissions/current-user
+        // Endpoint 3: GET /api/permissions/check
+        // Endpoint 4: PUT /api/permissions/role/{roleId}
+        // Endpoint 5: GET /api/roles/permissions
+    }
+    
+    // Helper method to build hierarchical menu
+    private static List<MenuItemResponse> BuildMenuHierarchy(IEnumerable<MenuItemDto> items)
+    {
+        // Build parent-child tree structure
+        // Top-level items have ParentMenuId = NULL
+        // Child items reference parent via ParentMenuId
+        // Return in CoreUI INavData format
+    }
+}
+```
+
+DTO Classes Needed:
+```csharp
+public record MenuItemDto(
+    int MenuId,
+    string Name,
+    string DisplayName,
+    string? Url,
+    string? Icon,
+    int? ParentMenuId,
+    int? ResourceId,
+    int SortOrder,
+    int Level
+);
+
+public record MenuItemResponse(
+    string name,
+    string? url,
+    object? iconComponent,
+    List<MenuItemResponse>? children
+);
+
+public record UserInfo(
+    int userId,
+    string username,
+    int roleId,
+    string roleName
+);
+
+public record ResourcePermission(
+    string resource,
+    bool canView,
+    bool canCreate,
+    bool canUpdate,
+    bool canDelete,
+    bool canExport,
+    bool canApprove
+);
+
+public record UpdatePermissionRequest(
+    int resourceId,
+    bool canView,
+    bool canCreate,
+    bool canUpdate,
+    bool canDelete,
+    bool canExport,
+    bool canApprove
+);
+```
+
+Database Connection:
+- Use Dapper for database operations
+- Connection string from configuration: app.Configuration.GetConnectionString("DefaultConnection")
+- Each endpoint should create SqlConnection using 'using' statement
+
+Authentication & Authorization:
+- All endpoints require .RequireAuthorization()
+- Admin-only endpoints use custom policy (if available) or check role in code
+- Get userId from JWT claims: context.User.FindFirst("UserId")?.Value
+- Handle unauthorized (401) if userId is null
+
+Error Handling:
+- Use try-catch blocks
+- Return appropriate HTTP status codes:
+  * 200 OK for success
+  * 400 Bad Request for invalid input
+  * 401 Unauthorized if not logged in
+  * 403 Forbidden if no permission
+  * 500 Internal Server Error for exceptions
+
+Menu Hierarchy Algorithm:
+1. Get flat list of menu items from sp_GetMenuByRole (ordered by SortPath)
+2. Use LINQ to create lookup dictionary: items.ToLookup(x => x.ParentMenuId)
+3. Recursively build tree starting from ParentMenuId = null
+4. For each parent, find children and set 'children' property
+5. Items with Url = null are parent menus (collapsible sections)
+6. Items with Url != null are leaf nodes (clickable links)
+
+Response Format Examples:
+
+Menu Response:
+[
+  {
+    "name": "Dashboard",
+    "url": "/dashboard",
+    "iconComponent": { "name": "cil-speedometer" }
+  },
+  {
+    "name": "Admin",
+    "iconComponent": { "name": "cil-shield-alt" },
+    "children": [
+      {
+        "name": "Users",
+        "url": "/users",
+        "iconComponent": { "name": "cil-user" }
+      }
+    ]
+  }
+]
+
+Permissions Response:
+{
+  "userId": 1,
+  "username": "admin",
+  "roleId": 1,
+  "roleName": "Administrator",
+  "permissions": [
+    {
+      "resource": "Users",
+      "canView": true,
+      "canCreate": true,
+      "canUpdate": true,
+      "canDelete": true,
+      "canExport": true,
+      "canApprove": false
+    }
+  ]
+}
+
+IMPORTANT NOTES:
+- Use Dapper's QueryAsync, QueryMultipleAsync, QueryFirstOrDefaultAsync
+- Stored procedure execution: "EXEC sp_Name @Param1, @Param2"
+- Always dispose SqlConnection using 'using' statement
+- Check for null userId before executing queries
+- Menu items with Level=0 are top-level, Level=1 are children, etc.
+- ParentMenuId=NULL indicates root level items
+- Icon format: { "name": "cil-icon-name" }
+
+USAGE IN Program.cs:
+After creating this file, register in Program.cs:
+```csharp
+app.MapMenuPermissionEndpoints();
+```
+
+COPILOT INSTRUCTION:
+Generate the complete MenuPermissionRoutes.cs file implementing all 5 endpoints with:
+1. Proper error handling
+2. JWT authentication validation
+3. Dapper database queries calling the stored procedures
+4. Hierarchical menu building logic
+5. Appropriate HTTP status codes
+6. All DTO record classes
+7. XML documentation comments for each endpoint

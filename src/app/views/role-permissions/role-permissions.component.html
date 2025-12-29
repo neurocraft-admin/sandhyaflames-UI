@@ -1,0 +1,83 @@
+<div class="container mt-4">
+  <h4>Role Permissions Management</h4>
+
+  <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+  <div *ngIf="success" class="alert alert-success">{{ success }}</div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-4">
+          <label class="form-label">Select Role</label>
+          <select class="form-control" [(ngModel)]="selectedRoleId" (change)="onRoleChange()">
+            <option [value]="null">-- Select a Role --</option>
+            <option *ngFor="let role of roles" [value]="role.roleId">{{ role.roleName }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="selectedRoleId && !loading" class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5>Permissions for {{ selectedRoleName }}</h5>
+      <button class="btn btn-primary" (click)="savePermissions()">Save Permissions</button>
+    </div>
+    <div class="card-body">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th class="text-center">
+              <label class="form-check-label">
+                View
+                <button class="btn btn-sm btn-link" (click)="toggleAll('canView')">Toggle All</button>
+              </label>
+            </th>
+            <th class="text-center">
+              <label class="form-check-label">
+                Create
+                <button class="btn btn-sm btn-link" (click)="toggleAll('canCreate')">Toggle All</button>
+              </label>
+            </th>
+            <th class="text-center">
+              <label class="form-check-label">
+                Update
+                <button class="btn btn-sm btn-link" (click)="toggleAll('canUpdate')">Toggle All</button>
+              </label>
+            </th>
+            <th class="text-center">
+              <label class="form-check-label">
+                Delete
+                <button class="btn btn-sm btn-link" (click)="toggleAll('canDelete')">Toggle All</button>
+              </label>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let resource of resources">
+            <td>{{ resource.displayName || resource.resourceName }}</td>
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input" [(ngModel)]="resource.canView" />
+            </td>
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input" [(ngModel)]="resource.canCreate" />
+            </td>
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input" [(ngModel)]="resource.canUpdate" />
+            </td>
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input" [(ngModel)]="resource.canDelete" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="text-center my-5">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+</div>
