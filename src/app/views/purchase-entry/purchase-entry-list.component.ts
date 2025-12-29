@@ -7,6 +7,7 @@ import { ToastService } from '../../services/toast.service';
 import { ProductDropdownService, ProductOption } from '../../services/product-dropdown.service';
 import { VendorDropdownService, VendorOption } from '../../services/vendor-dropdown.service';
 import { ProductPricingService } from '../../services/product-pricing.service';
+import { AuthService } from '../../auth/auth.service';
 
 @Component({
   selector: 'app-purchase-entry-list',
@@ -21,6 +22,7 @@ export class PurchaseEntryListComponent {
   private productSvc = inject(ProductDropdownService);
   private vendorSvc = inject(VendorDropdownService);
   private pricingSvc = inject(ProductPricingService);
+  private authService = inject(AuthService);
 
   rows: PurchaseEntry[] = [];
   products: ProductOption[] = [];
@@ -29,6 +31,13 @@ export class PurchaseEntryListComponent {
   isEditing = signal(false);
   editId: number | null = null;
   loading = signal(false);
+
+  permissions = {
+    canView: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false
+  };
 
   form = this.fb.group({
     vendorId: [0 as number, Validators.required],       // number (not string)
@@ -51,7 +60,18 @@ export class PurchaseEntryListComponent {
   );
 
   ngOnInit() {
+    this.loadPermissions();
     this.loadAll();
+  }
+
+  loadPermissions(): void {
+    this.authService.getUserPermissions('PurchaseEntry').subscribe(result => {
+      const mask = result.permissionMask;
+      this.permissions.canView = (mask & 1) === 1;
+      this.permissions.canCreate = (mask & 2) === 2;
+      this.permissions.canUpdate = (mask & 4) === 4;
+      this.permissions.canDelete = (mask & 8) === 8;
+    });
   }
 
   loadAll() {

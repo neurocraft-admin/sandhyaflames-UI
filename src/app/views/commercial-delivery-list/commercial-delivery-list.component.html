@@ -53,6 +53,7 @@
               <td>{{ delivery.Remarks || delivery.remarks || '-' }}</td>
               <td>
                 <button
+                  *ngIf="permissions.canUpdate"
                   cButton
                   color="primary"
                   size="sm"
@@ -63,6 +64,7 @@
                   Map Customers
                 </button>
                 <button
+                  *ngIf="permissions.canUpdate"
                   cButton
                   color="warning"
                   size="sm"

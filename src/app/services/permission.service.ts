@@ -34,6 +34,7 @@ export interface UserPermissions {
 export class PermissionService {
   private permissionsCache$ = new BehaviorSubject<Map<string, ResourcePermission>>(new Map());
   private isPermissionsLoaded = false;
+  private userInfo: UserPermissions | null = null;
 
   constructor(private http: HttpClient) {}
 
@@ -46,6 +47,7 @@ export class PermissionService {
     
     return this.http.get<UserPermissions>(url).pipe(
       tap(userPerms => {
+        this.userInfo = userPerms; // Store user info
         const permMap = new Map<string, ResourcePermission>();
         userPerms.permissions.forEach(perm => {
           permMap.set(perm.resource, perm);
@@ -170,5 +172,12 @@ export class PermissionService {
       this.loadUserPermissions().subscribe();
     }
     return this.permissionsCache$.asObservable();
+  }
+
+  /**
+   * Get current user info (username, role)
+   */
+  getUserInfo(): Observable<UserPermissions | null> {
+    return of(this.userInfo);
   }
 }

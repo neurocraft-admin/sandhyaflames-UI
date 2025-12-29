@@ -10,6 +10,7 @@ import { IconDirective } from '@coreui/icons-angular';
 import { DailyDeliveryService } from '../../services/daily-delivery.service';
 import { DailyDeliverySummary } from '../../models/daily-delivery-summary.model';
 import { ToastService } from '../../services/toast.service';
+import { AuthService } from '../../auth/auth.service';
 
 @Component({
   selector: 'app-commercial-delivery-list',
@@ -40,14 +41,34 @@ export class CommercialDeliveryListComponent implements OnInit {
   pageSize: number = 10;
   totalPages: number = 1;
 
+  // Permissions
+  permissions = {
+    canView: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false
+  };
+
   constructor(
     private deliveryService: DailyDeliveryService,
     private router: Router,
-    private toast: ToastService
+    private toast: ToastService,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
+    this.loadPermissions();
     this.loadCommercialDeliveries();
+  }
+
+  loadPermissions(): void {
+    this.authService.getUserPermissions('CommercialDeliveries').subscribe(result => {
+      const mask = result.permissionMask;
+      this.permissions.canView = (mask & 1) === 1;
+      this.permissions.canCreate = (mask & 2) === 2;
+      this.permissions.canUpdate = (mask & 4) === 4;
+      this.permissions.canDelete = (mask & 8) === 8;
+    });
   }
 
   loadCommercialDeliveries(): void {

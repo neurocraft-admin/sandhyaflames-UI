@@ -17,8 +17,10 @@ import {
 import { ToastService } from '../../services/toast.service';
 import { MenuService } from '../../services/menu.service';
 import { AppInitService } from '../../services/app-init.service';
+import { PermissionService } from '../../services/permission.service';
+import { AuthService } from '../../auth/auth.service';
 import { NgFor, NgIf, AsyncPipe  } from '@angular/common';
-import { Observable } from 'rxjs';
+import { Observable, interval } from 'rxjs';
 
 @Component({
   selector: 'app-default-layout',
@@ -46,9 +48,18 @@ export class DefaultLayoutComponent implements OnInit {
   public toastService = inject(ToastService);
   private menuService = inject(MenuService);
   private appInitService = inject(AppInitService);
+  private authService = inject(AuthService);
+  private permissionService = inject(PermissionService);
   
   // Observable for menu items (will be loaded from API)
   public sidebarItems$: Observable<INavData[]>;
+
+  // User session info
+  userEmail: string = '';
+  userRole: string = '';
+  sessionDuration: string = '0m';
+  uiVersion: string = '5.5.11';
+  apiVersion: string = '1.0.0'; // Will be fetched from API
   
   // Temporary fallback menu (will be replaced by API data)
   private fallbackMenu: INavData[] = [
@@ -171,11 +182,58 @@ export class DefaultLayoutComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Load user info from localStorage
+    this.loadUserInfo();
+
+    // Update session duration every minute
+    interval(60000).subscribe(() => {
+      this.updateSessionDuration();
+    });
+    this.updateSessionDuration();
+
     // Load menu and permissions from API
     this.appInitService.initializeApp().subscribe({
-      next: () => console.log('✅ App data loaded'),
+      next: () => {
+        console.log('✅ App data loaded');
+        // Reload user info after app initialization
+        this.loadUserInfo();
+      },
       error: () => console.log('⚠️ Using fallback menu')
     });
+  }
+
+  loadUserInfo(): void {
+    // First try PermissionService (loaded during app init)
+    this.permissionService.getUserInfo().subscribe(info => {
+      if (info) {
+        this.userEmail = info.username;
+        this.userRole = info.roleName;
+      }
+    });
+    
+    // Fallback to localStorage if PermissionService not loaded yet
+    const userInfo = this.authService.getUserInfo();
+    if (userInfo && !this.userEmail) {
+      this.userEmail = userInfo.email;
+      this.userRole = userInfo.roleName;
+    }
+  }
+
+  updateSessionDuration(): void {
+    const loginTime = this.authService.getLoginTime();
+    if (loginTime) {
+      const now = new Date().getTime();
+      const login = new Date(loginTime).getTime();
+      const diff = Math.floor((now - login) / 1000 / 60); // minutes
+      
+      if (diff < 60) {
+        this.sessionDuration = `${diff}m`;
+      } else {
+        const hours = Math.floor(diff / 60);
+        const minutes = diff % 60;
+        this.sessionDuration = `${hours}h ${minutes}m`;
+      }
+    }
   }
 
   logout() {
