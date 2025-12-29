@@ -40,6 +40,22 @@ export class AuthService {
     return !!this.getToken();
   }
 
+  // ✅ user session info
+  saveUserInfo(userInfo: { userId: number; email: string; roleName: string }) {
+    console.log('Saving user info to localStorage:', userInfo);
+    localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    localStorage.setItem('loginTime', new Date().toISOString());
+  }
+
+  getUserInfo(): { userId: number; email: string; roleName: string } | null {
+    const raw = localStorage.getItem('userInfo');
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  getLoginTime(): string | null {
+    return localStorage.getItem('loginTime');
+  }
+
   // ✅ permissions cache
   savePermissions(perms: PermissionEntry[]) {
     this.permissions = perms;
