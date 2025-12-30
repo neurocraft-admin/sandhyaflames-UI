@@ -301,14 +301,13 @@ After=network.target mssql-server.service
 Type=notify
 User=www-data
 WorkingDirectory=$BACKEND_DEPLOY_PATH/publish
-ExecStart=/usr/local/bin/dotnet $API_DLL
+ExecStart=/usr/bin/dotnet $API_DLL --urls http://localhost:$API_PORT
 Restart=always
 RestartSec=10
 KillSignal=SIGINT
 SyslogIdentifier=sandhyaflames-api
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
-Environment=ASPNETCORE_URLS=http://localhost:$API_PORT
 
 [Install]
 WantedBy=multi-user.target
