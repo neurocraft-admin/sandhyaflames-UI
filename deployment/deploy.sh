@@ -21,7 +21,7 @@ BRANCH="main"  # Production branch
 # Deployment Paths (Production VM)
 FRONTEND_DEPLOY_PATH="/var/www/sandhyaflames-frontend"
 BACKEND_DEPLOY_PATH="/opt/sandhyaflames-api"
-FRONTEND_BUILD_PATH="$FRONTEND_DEPLOY_PATH/sandhyaflames-UI/dist/sandhyaflames-ui/browser"
+FRONTEND_BUILD_PATH="$FRONTEND_DEPLOY_PATH/dist/sandhyaflames-ui/browser"
 NGINX_SITES="/etc/nginx/sites-available"
 NGINX_ENABLED="/etc/nginx/sites-enabled"
 
