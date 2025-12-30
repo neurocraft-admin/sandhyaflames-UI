@@ -23,7 +23,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
-            "outputPath": "dist/coreui-free-angular-admin-template",
+            "outputPath": "dist/sandhyaflames-ui",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -50,6 +50,12 @@
           },
           "configurations": {
             "production": {
+              "fileReplacements": [
+    {
+      "replace": "src/environments/environment.ts",
+      "with": "src/environments/environment.prod.ts"
+    }
+  ],
               "budgets": [
                 {
                   "type": "initial",
@@ -73,6 +79,9 @@
           "defaultConfiguration": "production"
         },
         "serve": {
+          "options": {
+    "proxyConfig": "proxy.conf.json"
+  },
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {

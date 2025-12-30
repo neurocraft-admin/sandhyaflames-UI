@@ -1,7 +1,7 @@
 {
-  "name": "coreui-free-angular-admin-template",
+  "name": "sandhya-flames",
   "version": "5.5.11",
-  "copyright": "Copyright 2025 creativeLabs Łukasz Holeczek",
+  "copyright": "Copyright 2025-2026 Neurocraft Systems and Solutions",
   "license": "MIT",
   "author": "The CoreUI Team (https://github.com/orgs/coreui/people) and contributors",
   "homepage": "https://coreui.io/angular",
@@ -12,7 +12,7 @@
   },
   "scripts": {
     "ng": "ng",
-    "start": "ng serve -o",
+    "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
@@ -52,6 +52,7 @@
     "@types/jasmine": "^5.1.9",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^22.18.0",
+    "baseline-browser-mapping": "^2.9.11",
     "jasmine-core": "^5.9.0",
     "karma": "^6.4.4",
     "karma-chrome-launcher": "^3.2.0",

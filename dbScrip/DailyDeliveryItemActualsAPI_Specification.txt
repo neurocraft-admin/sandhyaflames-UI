@@ -1,0 +1,526 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║          DAILY DELIVERY ITEM-LEVEL ACTUALS API SPECIFICATION                ║
+║         Track Individual Product Delivery Status & Quantities                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📋 OVERVIEW
+-----------
+Extends DailyDelivery functionality to track item-level actuals (delivered, pending)
+instead of just consolidated totals. Provides visibility into which specific products
+were delivered and which are still pending.
+
+Base URL: https://localhost:7183/api
+Controller Route: /api/dailydelivery
+
+All stored procedures are already created. Run: sp_DailyDeliveryItemActuals.sql
+
+⚠️ BACKWARD COMPATIBILITY
+This enhancement does NOT break existing functionality:
+- Existing /api/dailydelivery endpoints remain unchanged
+- New endpoints are additions, not modifications
+- Old update flow continues to work
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 1: INITIALIZE ITEM ACTUALS
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: POST
+URL: /api/dailydelivery/{deliveryId}/items/initialize
+Stored Procedure: sp_InitializeDeliveryItemActuals
+Parameters: @DeliveryId (from route)
+
+EXAMPLE: POST /api/dailydelivery/24/items/initialize
+
+WHEN TO CALL:
+- When delivery is first created (after creating DailyDelivery)
+- Before first time updating item actuals
+- Creates initial records with 0 delivered, all pending
+
+RESPONSE (200 OK):
+{
+  "success": 1,
+  "message": "Item actuals initialized"
+}
+
+BUSINESS LOGIC:
+- Reads all items from DailyDeliveryItems
+- Creates DailyDeliveryItemActuals records
+- Sets DeliveredQuantity = 0, PendingQuantity = PlannedQuantity
+- Skips items that already have actuals (idempotent)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 2: GET ITEM-LEVEL ACTUALS
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: GET
+URL: /api/dailydelivery/{deliveryId}/items/actuals
+Stored Procedure: sp_GetDeliveryItemActuals
+Parameters: @DeliveryId (from route)
+
+EXAMPLE: GET /api/dailydelivery/24/items/actuals
+
+RESPONSE (200 OK):
+[
+  {
+    "actualId": 1,
+    "deliveryId": 24,
+    "productId": 2,
+    "productName": "5KG LPG Cylinder",
+    "categoryName": "Cylinder",
+    "plannedQuantity": 10,
+    "deliveredQuantity": 8,
+    "pendingQuantity": 2,
+    "cashCollected": 4000.00,
+    "itemStatus": "Partial",
+    "remarks": "2 customers not available",
+    "updatedAt": "2025-12-26T10:30:00",
+    "unitPrice": 500.00,
+    "totalAmount": 4000.00
+  },
+  {
+    "actualId": 2,
+    "deliveryId": 24,
+    "productId": 6,
+    "productName": "14kg",
+    "categoryName": "Cylinder",
+    "plannedQuantity": 12,
+    "deliveredQuantity": 12,
+    "pendingQuantity": 0,
+    "cashCollected": 6720.00,
+    "itemStatus": "Completed",
+    "remarks": null,
+    "updatedAt": "2025-12-26T10:30:00",
+    "unitPrice": 560.00,
+    "totalAmount": 6720.00
+  }
+]
+
+FIELD DEFINITIONS:
+- actualId: Primary key of actuals record
+- plannedQuantity: Original quantity from DailyDeliveryItems.NoOfCylinders
+- deliveredQuantity: Actually delivered to customers
+- pendingQuantity: Still pending delivery
+- itemStatus: "Completed" | "Partial" | "Pending"
+  - Completed: pendingQuantity = 0
+  - Partial: deliveredQuantity > 0 AND pendingQuantity > 0
+  - Pending: deliveredQuantity = 0
+- cashCollected: Cash collected specifically for this item
+- totalAmount: deliveredQuantity × unitPrice (calculated)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 3: UPDATE ITEM-LEVEL ACTUALS (BULK)
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: PUT
+URL: /api/dailydelivery/{deliveryId}/items/actuals
+Stored Procedure: sp_UpdateDeliveryItemActuals
+Content-Type: application/json
+
+REQUEST PAYLOAD:
+{
+  "items": [
+    {
+      "productId": 2,
+      "delivered": 8,
+      "pending": 2,
+      "cashCollected": 4000,
+      "remarks": "2 customers not available"
+    },
+    {
+      "productId": 6,
+      "delivered": 12,
+      "pending": 0,
+      "cashCollected": 6720,
+      "remarks": ""
+    },
+    {
+      "productId": 4,
+      "delivered": 7,
+      "pending": 3,
+      "cashCollected": 700,
+      "remarks": "Will deliver tomorrow"
+    }
+  ]
+}
+
+STORED PROCEDURE PARAMETERS:
+- DeliveryId → @DeliveryId (from route)
+- items → @ItemsJson (converted to JSON string)
+
+BACKEND IMPLEMENTATION:
+In your DailyDeliveryController.cs:
+
+[HttpPut("{deliveryId}/items/actuals")]
+public async Task<IActionResult> UpdateItemActuals(int deliveryId, [FromBody] UpdateItemActualsRequest request)
+{
+    var itemsJson = JsonSerializer.Serialize(request.Items);
+    
+    using var conn = new SqlConnection(_connectionString);
+    using var cmd = new SqlCommand("sp_UpdateDeliveryItemActuals", conn);
+    cmd.CommandType = CommandType.StoredProcedure;
+    cmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+    cmd.Parameters.AddWithValue("@ItemsJson", itemsJson);
+    
+    await conn.OpenAsync();
+    var reader = await cmd.ExecuteReaderAsync();
+    
+    if (reader.Read())
+    {
+        return Ok(new { success = reader.GetInt32(0), message = reader.GetString(1) });
+    }
+    return StatusCode(500, new { message = "Failed to update item actuals" });
+}
+
+RESPONSE (200 OK):
+{
+  "success": 1,
+  "message": "Item actuals updated successfully"
+}
+
+BUSINESS LOGIC - WHAT HAPPENS:
+1. Validates delivery exists
+2. Parses JSON array of items
+3. For each item:
+   a. Calculates ItemStatus based on delivered/pending quantities
+   b. Updates or inserts DailyDeliveryItemActuals record
+4. Recalculates DailyDelivery aggregates:
+   - CompletedInvoices = count of items with Status = 'Completed'
+   - PendingInvoices = count of items with Status IN ('Pending', 'Partial')
+   - CashCollected = sum of all item.CashCollected
+5. Maintains data consistency
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 4: GET DELIVERY WITH ITEM ACTUALS (COMBINED)
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: GET
+URL: /api/dailydelivery/{deliveryId}/with-items
+Stored Procedure: sp_GetDeliveryWithItemActuals
+Parameters: @DeliveryId (from route)
+
+EXAMPLE: GET /api/dailydelivery/24/with-items
+
+RESPONSE (200 OK):
+{
+  "delivery": {
+    "deliveryId": 24,
+    "deliveryDate": "2025-10-13T00:00:00",
+    "vehicleId": 2,
+    "vehicleNumber": "KL 27H 8498",
+    "status": "Open",
+    "returnTime": null,
+    "remarks": "",
+    "completedInvoices": 1,
+    "pendingInvoices": 2,
+    "cashCollected": 11420.00,
+    "emptyCylindersReturned": 0
+  },
+  "items": [
+    {
+      "actualId": 1,
+      "productId": 2,
+      "productName": "5KG LPG Cylinder",
+      "categoryName": "Cylinder",
+      "plannedQuantity": 10,
+      "deliveredQuantity": 8,
+      "pendingQuantity": 2,
+      "cashCollected": 4000.00,
+      "itemStatus": "Partial",
+      "remarks": "2 customers not available",
+      "updatedAt": "2025-12-26T10:30:00",
+      "unitPrice": 500.00,
+      "totalAmount": 4000.00
+    }
+  ]
+}
+
+NOTE: This endpoint returns TWO result sets from the stored procedure.
+You'll need to handle multiple result sets in your C# code.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔷 ENDPOINT 5: CLOSE DELIVERY WITH ITEM VERIFICATION
+═══════════════════════════════════════════════════════════════════════════════
+
+METHOD: PUT
+URL: /api/dailydelivery/{deliveryId}/close-with-items
+Stored Procedure: sp_CloseDeliveryWithItemActuals
+Content-Type: application/json
+
+REQUEST PAYLOAD:
+{
+  "returnTime": "18:30:00",
+  "emptyCylindersReturned": 15,
+  "remarks": "Delivery completed successfully"
+}
+
+STORED PROCEDURE PARAMETERS:
+- DeliveryId → @DeliveryId (from route)
+- returnTime → @ReturnTime
+- emptyCylindersReturned → @EmptyCylindersReturned
+- remarks → @Remarks (nullable)
+
+RESPONSE (200 OK):
+{
+  "success": 1,
+  "message": "Delivery closed successfully"
+}
+
+BUSINESS LOGIC:
+1. Validates delivery exists and is not already closed
+2. Sets Status = 'Closed'
+3. Updates ReturnTime, EmptyCylindersReturned, Remarks
+4. Recalculates aggregates from item actuals
+5. Maintains consistency between item-level and delivery-level data
+
+ERROR RESPONSES:
+{
+  "message": "Delivery not found"
+}
+{
+  "message": "Delivery is already closed"
+}
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📝 BACKEND IMPLEMENTATION CHECKLIST
+═══════════════════════════════════════════════════════════════════════════════
+
+☐ 1. Run sp_DailyDeliveryItemActuals.sql to create database objects
+☐ 2. Add new endpoints to existing DailyDeliveryController.cs
+☐ 3. Create C# request/response models:
+     - UpdateItemActualsRequest
+     - ItemActualDto
+     - DeliveryWithItemsResponse
+☐ 4. Handle multiple result sets for sp_GetDeliveryWithItemActuals
+☐ 5. Use System.Text.Json for JSON serialization
+☐ 6. Follow existing pattern from CustomersController
+☐ 7. Add proper exception handling
+☐ 8. Test with Swagger
+☐ 9. Optional: Call sp_InitializeDeliveryItemActuals automatically when creating delivery
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🎯 C# IMPLEMENTATION PROMPT FOR .NET DEVELOPER
+═══════════════════════════════════════════════════════════════════════════════
+
+TASK: Add item-level actuals tracking to DailyDeliveryController
+
+CONTEXT:
+Currently, DailyDelivery only tracks consolidated totals (completedInvoices, pendingInvoices).
+We need item-level tracking to know which specific products were delivered/pending.
+
+REQUIREMENTS:
+1. Add 5 new endpoints to existing Controllers/DailyDeliveryController.cs
+2. Follow existing pattern in your codebase
+3. Use async/await throughout
+4. Handle nullable fields properly
+5. Use System.Text.Json for JSON serialization
+6. Return proper HTTP status codes (200, 404, 500)
+
+NEW ENDPOINTS TO ADD:
+
+1. POST   /api/dailydelivery/{deliveryId}/items/initialize
+2. GET    /api/dailydelivery/{deliveryId}/items/actuals
+3. PUT    /api/dailydelivery/{deliveryId}/items/actuals
+4. GET    /api/dailydelivery/{deliveryId}/with-items
+5. PUT    /api/dailydelivery/{deliveryId}/close-with-items
+
+C# MODELS NEEDED:
+
+public class ItemActualDto
+{
+    public int ActualId { get; set; }
+    public int DeliveryId { get; set; }
+    public int ProductId { get; set; }
+    public string ProductName { get; set; }
+    public string CategoryName { get; set; }
+    public int PlannedQuantity { get; set; }
+    public int DeliveredQuantity { get; set; }
+    public int PendingQuantity { get; set; }
+    public decimal CashCollected { get; set; }
+    public string ItemStatus { get; set; }
+    public string? Remarks { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal TotalAmount { get; set; }
+}
+
+public class UpdateItemActualsRequest
+{
+    public List<ItemActualInput> Items { get; set; }
+}
+
+public class ItemActualInput
+{
+    public int ProductId { get; set; }
+    public int Delivered { get; set; }
+    public int Pending { get; set; }
+    public decimal CashCollected { get; set; }
+    public string? Remarks { get; set; }
+}
+
+public class CloseDeliveryWithItemsRequest
+{
+    public string ReturnTime { get; set; }
+    public int EmptyCylindersReturned { get; set; }
+    public string? Remarks { get; set; }
+}
+
+EXAMPLE IMPLEMENTATION (Endpoint 3):
+
+[HttpPut("{deliveryId}/items/actuals")]
+public async Task<IActionResult> UpdateItemActuals(int deliveryId, [FromBody] UpdateItemActualsRequest request)
+{
+    try
+    {
+        var itemsJson = System.Text.Json.JsonSerializer.Serialize(request.Items, new JsonSerializerOptions 
+        { 
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
+        });
+        
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand("sp_UpdateDeliveryItemActuals", conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+        cmd.Parameters.AddWithValue("@ItemsJson", itemsJson);
+        
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+        
+        if (reader.Read())
+        {
+            return Ok(new 
+            { 
+                success = reader.GetInt32(0), 
+                message = reader.GetString(1) 
+            });
+        }
+        
+        return StatusCode(500, new { message = "Failed to update item actuals" });
+    }
+    catch (SqlException ex)
+    {
+        return BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { message = "An error occurred", detail = ex.Message });
+    }
+}
+
+HANDLING MULTIPLE RESULT SETS (Endpoint 4):
+
+[HttpGet("{deliveryId}/with-items")]
+public async Task<IActionResult> GetDeliveryWithItems(int deliveryId)
+{
+    try
+    {
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand("sp_GetDeliveryWithItemActuals", conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@DeliveryId", deliveryId);
+        
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+        
+        // First result set: Delivery header
+        object? delivery = null;
+        if (reader.Read())
+        {
+            delivery = new
+            {
+                deliveryId = reader.GetInt32(reader.GetOrdinal("DeliveryId")),
+                deliveryDate = reader.GetDateTime(reader.GetOrdinal("DeliveryDate")),
+                vehicleId = reader.GetInt32(reader.GetOrdinal("VehicleId")),
+                vehicleNumber = reader.GetString(reader.GetOrdinal("VehicleNumber")),
+                status = reader.GetString(reader.GetOrdinal("Status")),
+                returnTime = reader.IsDBNull(reader.GetOrdinal("ReturnTime")) ? null : reader.GetTimeSpan(reader.GetOrdinal("ReturnTime")).ToString(),
+                remarks = reader.IsDBNull(reader.GetOrdinal("Remarks")) ? null : reader.GetString(reader.GetOrdinal("Remarks")),
+                completedInvoices = reader.GetInt32(reader.GetOrdinal("CompletedInvoices")),
+                pendingInvoices = reader.GetInt32(reader.GetOrdinal("PendingInvoices")),
+                cashCollected = reader.GetDecimal(reader.GetOrdinal("CashCollected")),
+                emptyCylindersReturned = reader.GetInt32(reader.GetOrdinal("EmptyCylindersReturned"))
+            };
+        }
+        
+        // Move to second result set: Items
+        await reader.NextResultAsync();
+        var items = new List<ItemActualDto>();
+        while (reader.Read())
+        {
+            items.Add(new ItemActualDto
+            {
+                ActualId = reader.GetInt32(reader.GetOrdinal("ActualId")),
+                DeliveryId = reader.GetInt32(reader.GetOrdinal("DeliveryId")),
+                ProductId = reader.GetInt32(reader.GetOrdinal("ProductId")),
+                ProductName = reader.GetString(reader.GetOrdinal("ProductName")),
+                CategoryName = reader.GetString(reader.GetOrdinal("CategoryName")),
+                PlannedQuantity = reader.GetInt32(reader.GetOrdinal("PlannedQuantity")),
+                DeliveredQuantity = reader.GetInt32(reader.GetOrdinal("DeliveredQuantity")),
+                PendingQuantity = reader.GetInt32(reader.GetOrdinal("PendingQuantity")),
+                CashCollected = reader.GetDecimal(reader.GetOrdinal("CashCollected")),
+                ItemStatus = reader.GetString(reader.GetOrdinal("ItemStatus")),
+                Remarks = reader.IsDBNull(reader.GetOrdinal("Remarks")) ? null : reader.GetString(reader.GetOrdinal("Remarks")),
+                UpdatedAt = reader.GetDateTime(reader.GetOrdinal("UpdatedAt")),
+                UnitPrice = reader.GetDecimal(reader.GetOrdinal("UnitPrice")),
+                TotalAmount = reader.GetDecimal(reader.GetOrdinal("TotalAmount"))
+            });
+        }
+        
+        if (delivery == null)
+        {
+            return NotFound(new { message = "Delivery not found" });
+        }
+        
+        return Ok(new { delivery, items });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { message = "An error occurred", detail = ex.Message });
+    }
+}
+
+TESTING:
+After implementation, verify:
+✓ Initialize creates actuals for all delivery items
+✓ GET actuals returns correct planned/delivered/pending quantities
+✓ PUT actuals updates items and recalculates delivery totals
+✓ ItemStatus correctly shows Completed/Partial/Pending
+✓ Close delivery works with item verification
+✓ Swagger shows all new endpoints
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 INTEGRATION WITH EXISTING SYSTEM
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW:
+
+1. CREATE DELIVERY (existing flow - no change)
+   POST /api/dailydelivery
+   → Creates DailyDelivery + DailyDeliveryItems
+
+2. INITIALIZE ITEM ACTUALS (new - optional, can be automatic)
+   POST /api/dailydelivery/{id}/items/initialize
+   → Creates DailyDeliveryItemActuals records
+
+3. DURING DELIVERY - UPDATE ACTUALS (new)
+   PUT /api/dailydelivery/{id}/items/actuals
+   → Update delivered/pending quantities per item
+
+4. CLOSE DELIVERY (enhanced)
+   PUT /api/dailydelivery/{id}/close-with-items
+   → Closes delivery with verified item totals
+
+BACKWARD COMPATIBILITY:
+- Old flow (consolidated update) still works
+- New flow (item-level) is opt-in
+- Can migrate gradually
+- Both update DailyDelivery aggregates
+
+═══════════════════════════════════════════════════════════════════════════════

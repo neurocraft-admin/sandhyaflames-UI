@@ -1,15 +1,25 @@
-<c-sidebar
-  class="sidebar sidebar-dark bg-dark"
-  *ngIf="sidebarItems && sidebarItems.length > 0"
->
-  <c-sidebar-nav [navItems]="sidebarItems"></c-sidebar-nav>
+<c-sidebar class="sidebar sidebar-dark bg-dark" visible="true">
+  <!-- force visible sidebar -->
+  <c-sidebar-nav [navItems]="(sidebarItems$ | async) ?? []"></c-sidebar-nav>
 </c-sidebar>
 
 <div class="wrapper d-flex flex-column min-vh-100 bg-light w-100">
   <c-header class="header header-sticky mb-4">
     <div class="container-fluid d-flex justify-content-between align-items-center">
-      <h5 class="mb-0">Gas Agency Management</h5>
-      <button cButton color="danger" (click)="logout()">Logout</button>
+      <h5 class="mb-0">Sandhya Flames</h5>
+      <div class="d-flex align-items-center gap-3">
+        <!-- User Session Info -->
+        <div class="text-end" style="font-size: 0.875rem;">
+          <div class="text-dark fw-semibold">{{ userEmail }}</div>
+          <div class="text-muted" style="font-size: 0.75rem;">
+            <span class="badge bg-primary me-1">{{ userRole }}</span>
+            <span class="me-2">⏱ {{ sessionDuration }}</span>
+            <span class="me-1">UI: v{{ uiVersion }}</span>
+            <span>API: v{{ apiVersion }}</span>
+          </div>
+        </div>
+        <button cButton color="danger" (click)="logout()">Logout</button>
+      </div>
     </div>
   </c-header>
 
@@ -18,9 +28,17 @@
   </div>
 
   <c-footer class="footer">
-    <div><strong>Gas Agency © 2025</strong></div>
+    <div><strong>Sandhya Flames © 2025-2026</strong></div>
     <div class="ms-auto">
-      Powered by <a href="https://coreui.io" target="_blank">CoreUI</a>
+      Powered by <a href="#" target="_blank">NeuroCraft</a>
     </div>
   </c-footer>
 </div>
+<c-toaster position="top-center" class="top-center-fix">
+  <c-toast *ngFor="let toast of toastService.toasts" [color]="toast.color || 'primary'"
+    [autohide]="toast.autohide ?? true" [delay]="toast.delay ?? 3000" [visible]="true"
+    (cClosed)="toastService.remove(toast)">
+    <c-toast-header *ngIf="toast.title">{{ toast.title }}</c-toast-header>
+    <c-toast-body>{{ toast.body }}</c-toast-body>
+  </c-toast>
+</c-toaster>

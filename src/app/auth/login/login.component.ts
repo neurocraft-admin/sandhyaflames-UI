@@ -33,17 +33,39 @@ export class LoginComponent {
 
     this.auth.login(email, password).subscribe({
       next: (res: any) => {
+        console.log('✅ Login successful, response:', res);
+        
         // save token
         this.auth.setToken(res.token);
+        console.log('✅ Token saved');
+        
+        // save user info with correct field names
+        this.auth.saveUserInfo({
+          userId: res.userId,
+          email: email, // Use the email from login form
+          roleName: res.roleName
+        });
+        console.log('✅ User info saved');
 
         // fetch permissions
-        this.auth.fetchPermissions(res.userId).subscribe(perms => {
-          this.auth.savePermissions(perms);
+        this.auth.fetchPermissions(res.userId).subscribe({
+          next: (perms) => {
+            console.log('Fetched permissions from API:', perms);
+            this.auth.savePermissions(perms);
+            console.log('Saved permissions to localStorage');
 
-          // ✅ navigate and refresh sidebar
-          this.router.navigate(['/dashboard']).then(() => {
-            window.location.reload();
-          });
+            // Small delay to ensure all data is saved before reload
+            setTimeout(() => {
+              this.router.navigate(['/dashboard']).then(() => {
+                window.location.reload();
+              });
+            }, 100);
+          },
+          error: (err) => {
+            console.error('Failed to fetch permissions:', err);
+            // Navigate anyway, but without permissions
+            this.router.navigate(['/dashboard']);
+          }
         });
       },
       error: () => {

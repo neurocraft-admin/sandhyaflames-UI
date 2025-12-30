@@ -1,0 +1,59 @@
+<div class="container mt-3">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title mb-3">Daily Delivery Summary</h5>
+
+      <!-- Filters -->
+      <div class="row g-2 mb-3">
+        <div class="col-md-3">
+          <label>From Date</label>
+          <input type="date" class="form-control" [(ngModel)]="fromDate" />
+        </div>
+        <div class="col-md-3">
+          <label>To Date</label>
+          <input type="date" class="form-control" [(ngModel)]="toDate" />
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+          <button class="btn btn-primary w-100" (click)="loadSummary()">Filter</button>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <table class="table table-bordered table-striped table-sm">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Vehicle</th>
+            <th>Status</th>
+            <th>Completed</th>
+            <th>Pending</th>
+            <th>Cash</th>
+            <th>Cylinders</th>
+            <th>Accessories</th>
+            <th>Total Items</th>
+            <th>Rate (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let s of summaries">
+            <td>{{ s.deliveryDate | date }}</td>
+            <td>{{ s.vehicleNo }}</td>
+            <td>{{ s.status }}</td>
+            <td>{{ s.completedInvoices }}</td>
+            <td>{{ s.pendingInvoices }}</td>
+            <td>{{ s.cashCollected | currency:'INR' }}</td>
+            <td>{{ s.cylindersDelivered }}</td>
+            <td>{{ s.nonCylItemsDelivered }}</td>
+            <td>{{ s.totalItemsDelivered }}</td>
+            <td [ngClass]="completionRateColor(s.deliveryCompletionRate)">
+              {{ s.deliveryCompletionRate }}%
+            </td>
+          </tr>
+          <tr *ngIf="summaries.length === 0">
+            <td colspan="10" class="text-center text-muted">No records found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

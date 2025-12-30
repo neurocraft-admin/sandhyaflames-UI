@@ -1,0 +1,237 @@
+<div class="container-fluid mt-3">
+  <!-- Header Section -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">
+      <i class="cil-basket me-2"></i>
+      Stock Register
+    </h4>
+    <div class="d-flex gap-2">
+      <button 
+        class="btn btn-sm btn-outline-primary" 
+        (click)="toggleView('detailed')"
+        [class.active]="!showSummary()">
+        <i class="cil-list me-1"></i> Detailed View
+      </button>
+      <button 
+        class="btn btn-sm btn-outline-primary" 
+        (click)="toggleView('summary')"
+        [class.active]="showSummary()">
+        <i class="cil-chart-pie me-1"></i> Summary View
+      </button>
+      <button 
+        class="btn btn-sm btn-primary" 
+        (click)="refreshData()">
+        <i class="cil-reload me-1"></i> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="card mb-3" *ngIf="!showSummary()">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="input-group">
+            <input 
+              type="text" 
+              class="form-control" 
+              placeholder="Search by product, category, or subcategory..."
+              [(ngModel)]="searchTerm"
+              (keyup.enter)="applySearch()">
+            <button class="btn btn-primary" type="button" (click)="applySearch()">
+              <i class="cil-search"></i> Search
+            </button>
+            <button class="btn btn-outline-secondary" type="button" (click)="clearSearch()" *ngIf="searchTerm">
+              <i class="cil-x"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-md-6" *ngIf="showSummary()">
+          <select class="form-select" [(ngModel)]="groupByOption" (change)="loadSummary()">
+            <option value="Product">Group by Product</option>
+            <option value="Category">Group by Category</option>
+            <option value="SubCategory">Group by SubCategory</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="loading()" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-2 text-muted">Loading stock data...</p>
+  </div>
+
+  <!-- Detailed Stock Register Table -->
+  <div class="card" *ngIf="!loading() && !showSummary()">
+    <div class="card-header bg-light">
+      <strong>Stock Details</strong>
+      <span class="badge bg-info ms-2">{{ filteredItems().length }} Products</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th>#</th>
+              <th>Product Name</th>
+              <th>Category</th>
+              <th>SubCategory</th>
+              <th class="text-center">Filled</th>
+              <th class="text-center">Empty</th>
+              <th class="text-center">Damaged</th>
+              <th class="text-center">Total</th>
+              <th>Last Updated</th>
+              <th>Updated By</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of filteredItems(); let i = index">
+              <td>{{ i + 1 }}</td>
+              <td><strong>{{ item.productName }}</strong></td>
+              <td>{{ item.categoryName }}</td>
+              <td><small class="text-muted">{{ item.subCategoryName }}</small></td>
+              <td class="text-center">
+                <span [ngClass]="item.filledStock === 0 ? 'text-danger fw-bold' : (item.filledStock < 50 ? 'text-warning fw-bold' : 'text-success')">
+                  {{ item.filledStock }}
+                </span>
+              </td>
+              <td class="text-center">
+                <span class="badge bg-secondary">{{ item.emptyStock }}</span>
+              </td>
+              <td class="text-center">
+                <span class="badge" [ngClass]="item.damagedStock > 0 ? 'bg-danger' : 'bg-light text-dark'">
+                  {{ item.damagedStock }}
+                </span>
+              </td>
+              <td class="text-center"><strong>{{ item.totalStock }}</strong></td>
+              <td><small>{{ item.lastUpdated | date: 'dd/MM/yyyy HH:mm' }}</small></td>
+              <td><small class="text-muted">{{ item.updatedBy || '-' }}</small></td>
+            </tr>
+            <tr *ngIf="filteredItems().length === 0">
+              <td colspan="10" class="text-center text-muted py-4">
+                <i class="cil-info me-2"></i>
+                No stock records found. Try a different search term.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot class="table-secondary fw-bold" *ngIf="filteredItems().length > 0">
+            <tr>
+              <td colspan="4" class="text-end">Grand Total:</td>
+              <td class="text-center">{{ getTotalFilledStock() }}</td>
+              <td class="text-center">{{ getTotalEmptyStock() }}</td>
+              <td class="text-center">{{ getTotalDamagedStock() }}</td>
+              <td class="text-center">{{ getTotalStock() }}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary View Table -->
+  <div class="card" *ngIf="!loading() && showSummary()">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <div>
+        <strong>Stock Summary</strong>
+        <span class="badge bg-info ms-2">{{ summaryData().length }} Groups</span>
+      </div>
+      <select class="form-select form-select-sm w-auto" [(ngModel)]="groupByOption" (change)="loadSummary()">
+        <option value="Product">Group by Product</option>
+        <option value="Category">Group by Category</option>
+        <option value="SubCategory">Group by SubCategory</option>
+      </select>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th>#</th>
+              <th>Group Name</th>
+              <th class="text-center">Products</th>
+              <th class="text-center">Filled</th>
+              <th class="text-center">Empty</th>
+              <th class="text-center">Damaged</th>
+              <th class="text-center">Total Stock</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let summary of summaryData(); let i = index">
+              <td>{{ i + 1 }}</td>
+              <td>
+                <strong>{{ summary.groupName }}</strong>
+              </td>
+              <td class="text-center">
+                <span class="badge bg-secondary">{{ summary.productCount }}</span>
+              </td>
+              <td class="text-center">
+                <span class="text-success fw-bold">{{ summary.filledStock }}</span>
+              </td>
+              <td class="text-center">
+                <span class="badge bg-secondary">{{ summary.emptyStock }}</span>
+              </td>
+              <td class="text-center">
+                <span class="badge" [class.bg-danger]="summary.damagedStock > 0" [class.bg-light]="summary.damagedStock === 0">
+                  {{ summary.damagedStock }}
+                </span>
+              </td>
+              <td class="text-center">
+                <strong>{{ summary.totalStock }}</strong>
+              </td>
+            </tr>
+            <tr *ngIf="summaryData().length === 0">
+              <td colspan="7" class="text-center text-muted py-4">
+                No summary data available
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info Cards -->
+  <div class="row mt-3" *ngIf="!loading() && !showSummary() && filteredItems().length > 0">
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body">
+          <h6 class="card-title mb-0">Filled Stock</h6>
+          <h3 class="mb-0">{{ getTotalFilledStock() }}</h3>
+          <small>Ready for delivery</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-secondary text-white">
+        <div class="card-body">
+          <h6 class="card-title mb-0">Empty Stock</h6>
+          <h3 class="mb-0">{{ getTotalEmptyStock() }}</h3>
+          <small>Needs refilling</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-danger text-white">
+        <div class="card-body">
+          <h6 class="card-title mb-0">Damaged Stock</h6>
+          <h3 class="mb-0">{{ getTotalDamagedStock() }}</h3>
+          <small>Needs attention</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-primary text-white">
+        <div class="card-body">
+          <h6 class="card-title mb-0">Total Inventory</h6>
+          <h3 class="mb-0">{{ getTotalStock() }}</h3>
+          <small>All cylinders</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

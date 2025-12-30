@@ -1,9 +1,8 @@
 <c-row>
   <c-col xs="12">
     <app-docs-components href="components/toast" title="Toast" />
-    @for (pos of positions | slice : 1; track pos) {
-      <c-toaster [ngClass]="'p-3'" position="fixed" placement="{{pos}}" />
-    }
+    <c-toaster position="fixed" placement="middle-center" class="p-3" [ngStyle]="{ zIndex: '1060' }">
+    </c-toaster>
     <c-card>
       <c-card-header>
         Toaster
@@ -31,9 +30,9 @@
                   <span cInputGroupText>Position</span>
                   <select cSelect formControlName="position">
                     @for (position of positions; track position) {
-                      <option [ngValue]="position">
-                        {{ position }}
-                      </option>
+                    <option [ngValue]="position">
+                      {{ position }}
+                    </option>
                     }
                   </select>
                 </c-input-group>
@@ -42,9 +41,9 @@
                   <span cInputGroupText>Color</span>
                   <select cSelect formControlName="color">
                     @for (color of colors; track color) {
-                      <option [ngValue]="color">
-                        {{ color }}
-                      </option>
+                    <option [ngValue]="color">
+                      {{ color }}
+                    </option>
                     }
                   </select>
                 </c-input-group>
@@ -75,7 +74,7 @@
                   <c-toast-body>This is a static toast in a static toaster</c-toast-body>
                 </c-toast>
                 <app-toast-simple #toast [autohide]="false" [fade]="true" [visible]="true" [title]="'App Toast'"
-                                  color="secondary" cTextColor="light">
+                  color="secondary" cTextColor="light">
                   This is a toast in static positioned App toaster! {{ toast.index() }}
                 </app-toast-simple>
               </c-toaster>

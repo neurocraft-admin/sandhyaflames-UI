@@ -1,0 +1,530 @@
+═══════════════════════════════════════════════════════════════════════════════════
+🤖 GITHUB COPILOT PROMPT FOR VISUAL STUDIO
+   Fix User & Role Routes - Add Missing /list Endpoints
+═══════════════════════════════════════════════════════════════════════════════════
+
+📋 OBJECTIVE:
+Fix existing UserRoutes.cs and RoleRoutes.cs to add missing /list endpoints
+Your Angular frontend expects /api/users/list and /api/roles/list but they don't exist
+
+──────────────────────────────────────────────────────────────────────────────────
+🔧 CURRENT SITUATION
+──────────────────────────────────────────────────────────────────────────────────
+
+EXISTING ENDPOINTS:
+✅ POST /api/users
+✅ PUT /api/users/{id}
+✅ DELETE /api/users/{id}
+❌ GET /api/users/list - MISSING (frontend expects this)
+
+✅ POST /api/roles/create
+✅ PUT /api/roles/update
+✅ DELETE /api/roles/delete/{id}
+❌ GET /api/roles/list - MISSING (frontend expects this)
+
+STORED PROCEDURES ALREADY EXIST:
+✅ sp_ListUsers (created earlier)
+✅ sp_ListRoles (created earlier)
+
+──────────────────────────────────────────────────────────────────────────────────
+🎯 WHAT TO ADD
+──────────────────────────────────────────────────────────────────────────────────
+
+═══════════════════════════════════════════════════════════════════════════════════
+ADD TO UserRoutes.cs (in MapUserRoutes method)
+═══════════════════════════════════════════════════════════════════════════════════
+
+Add this BEFORE the existing endpoints:
+
+// ===============================================================
+// 📋 LIST ALL USERS
+// ===============================================================
+app.MapGet("/api/users/list", async (IConfiguration config) =>
+{
+    try
+    {
+        using var conn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+        using var cmd = new SqlCommand("sp_ListUsers", conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        var users = new List<object>();
+        while (await reader.ReadAsync())
+        {
+            users.Add(new
+            {
+                userId = reader.GetInt32(reader.GetOrdinal("userId")),
+                fullName = reader.GetString(reader.GetOrdinal("fullName")),
+                email = reader.GetString(reader.GetOrdinal("email")),
+                roleId = reader.GetInt32(reader.GetOrdinal("roleId")),
+                roleName = reader.GetString(reader.GetOrdinal("roleName")),
+                isActive = reader.GetBoolean(reader.GetOrdinal("isActive"))
+            });
+        }
+
+        return Results.Ok(users);
+    }
+    catch (SqlException sqlEx)
+    {
+        Console.WriteLine($"SQL Error in ListUsers: {sqlEx.Message}");
+        return Results.Json(
+            new { success = false, errorCode = "SQL_ERROR", message = sqlEx.Message },
+            statusCode: 400);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error in ListUsers: {ex.Message}");
+        return Results.Json(
+            new { success = false, errorCode = "GENERAL_ERROR", message = ex.Message },
+            statusCode: 500);
+    }
+})
+.WithTags("Users")
+.WithName("ListUsers");
+
+═══════════════════════════════════════════════════════════════════════════════════
+ADD TO RoleRoutes.cs (in MapRoleManagementRoutes method)
+═══════════════════════════════════════════════════════════════════════════════════
+
+Add this BEFORE the existing endpoints:
+
+// ===============================================================
+// 📋 LIST ALL ROLES
+// ===============================================================
+var group = app.MapGroup("/api/roles").WithTags("Roles");
+
+group.MapGet("/list", async (IConfiguration config) =>
+{
+    try
+    {
+        using var conn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+        using var cmd = new SqlCommand("sp_ListRoles", conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        var roles = new List<object>();
+        while (await reader.ReadAsync())
+        {
+            roles.Add(new
+            {
+                roleId = reader.GetInt32(reader.GetOrdinal("roleId")),
+                roleName = reader.GetString(reader.GetOrdinal("roleName")),
+                description = reader.IsDBNull(reader.GetOrdinal("description"))
+                    ? null
+                    : reader.GetString(reader.GetOrdinal("description")),
+                isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
+                userCount = reader.GetInt32(reader.GetOrdinal("userCount"))
+            });
+        }
+
+        return Results.Ok(roles);
+    }
+    catch (SqlException sqlEx)
+    {
+        Console.WriteLine($"SQL Error in ListRoles: {sqlEx.Message}");
+        return Results.Json(
+            new { success = false, errorCode = "SQL_ERROR", message = sqlEx.Message },
+            statusCode: 400);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error in ListRoles: {ex.Message}");
+        return Results.Json(
+            new { success = false, errorCode = "GENERAL_ERROR", message = ex.Message },
+            statusCode: 500);
+    }
+});
+
+──────────────────────────────────────────────────────────────────────────────────
+✅ REQUIRED USING STATEMENTS
+──────────────────────────────────────────────────────────────────────────────────
+
+Make sure these are at the top of both files:
+
+using Microsoft.Data.SqlClient;
+using System.Data;
+
+──────────────────────────────────────────────────────────────────────────────────
+🎯 FINAL RESULT
+──────────────────────────────────────────────────────────────────────────────────
+
+After adding these endpoints:
+✅ GET /api/users/list will work
+✅ GET /api/roles/list will work
+✅ Frontend will successfully load users and roles tables
+✅ No more 404 errors in browser console
+
+══════════════════════════════════════════════════════════════════════════════════
+💡 IMPLEMENTATION NOTES
+═══════════════════════════════════════════════════════════════════════════════════
+
+1. Add the /list endpoint code to your existing files
+2. Keep all existing endpoints - don't remove them
+3. The stored procedures sp_ListUsers and sp_ListRoles already exist
+4. Test by navigating to http://localhost:4200/users and http://localhost:4200/roles
+
+──────────────────────────────────────────────────────────────────────────────────
+📂 PROJECT CONTEXT
+──────────────────────────────────────────────────────────────────────────────────
+
+Namespace: WebAPI.Routes
+Files: UserRoutes.cs, RoleRoutes.cs
+Architecture: .NET Core Minimal API with stored procedures
+Database: SQL Server (sandhyaflames)
+Authentication: JWT Bearer tokens
+
+REFERENCE FILE TO FOLLOW:
+DailyDeliveryRoutes.cs - Use this as the EXACT template for all patterns
+
+──────────────────────────────────────────────────────────────────────────────────
+🗄️ DATABASE SCHEMA
+──────────────────────────────────────────────────────────────────────────────────
+
+TABLE: Users (Already Exists)
+  - UserId INT PRIMARY KEY IDENTITY
+  - Email NVARCHAR(100)
+  - FullName NVARCHAR(100)
+  - Password NVARCHAR(255) -- Hashed
+  - RoleId INT (Foreign key to Roles table)
+  - IsActive BIT
+
+TABLE: Roles (Already Exists)
+  - RoleId INT PRIMARY KEY IDENTITY
+  - RoleName NVARCHAR(50)
+  - Description NVARCHAR(255)
+  - IsActive BIT
+
+──────────────────────────────────────────────────────────────────────────────────
+🎯 API ENDPOINTS TO IMPLEMENT
+──────────────────────────────────────────────────────────────────────────────────
+
+═══════════════════════════════════════════════════════════════════════════════════
+FILE 1: UserRoutes.cs
+═══════════════════════════════════════════════════════════════════════════════════
+
+// ===============================================================
+// 1️⃣ LIST ALL USERS
+// ===============================================================
+app.MapGet("/api/users/list", async (IConfiguration config) =>
+{
+    STORED PROCEDURE: sp_ListUsers (create this)
+    - Returns all users with role information
+    - JOIN Users with Roles to get RoleName
+    
+    RESPONSE FORMAT:
+    [
+      {
+        "userId": 1,
+        "fullName": "Admin User",
+        "email": "admin@example.com",
+        "roleId": 1,
+        "roleName": "Administrator",
+        "isActive": true
+      }
+    ]
+})
+.WithTags("Users")
+.WithName("ListUsers");
+
+// ===============================================================
+// 2️⃣ GET USER BY ID
+// ===============================================================
+app.MapGet("/api/users/{id}", async (int id, IConfiguration config) =>
+{
+    STORED PROCEDURE: sp_GetUserById (create this)
+    - Returns single user with role details
+    
+    RESPONSE: Same as list but single object
+})
+.WithTags("Users")
+.WithName("GetUser");
+
+// ===============================================================
+// 3️⃣ CREATE USER
+// ===============================================================
+app.MapPost("/api/users/create", async ([FromBody] CreateUserRequest request, IConfiguration config) =>
+{
+    REQUEST MODEL:
+    public class CreateUserRequest
+    {
+        public string FullName { get; set; }
+        public string Email { get; set; }
+        public string Password { get; set; }  // Plain text, will be hashed
+        public int RoleId { get; set; }
+    }
+    
+    STORED PROCEDURE: sp_CreateUser (create this)
+    - Hash password using BCrypt or simple HASHBYTES('SHA2_256', @Password)
+    - Insert user record
+    - Return userId or success message
+    
+    RESPONSE:
+    { "success": true, "userId": 5, "message": "User created successfully" }
+})
+.WithTags("Users")
+.WithName("CreateUser");
+
+// ===============================================================
+// 4️⃣ UPDATE USER
+// ===============================================================
+app.MapPut("/api/users/update", async ([FromBody] UpdateUserRequest request, IConfiguration config) =>
+{
+    REQUEST MODEL:
+    public class UpdateUserRequest
+    {
+        public int UserId { get; set; }
+        public string FullName { get; set; }
+        public string Email { get; set; }
+        public string? Password { get; set; }  // Optional, only if changing
+        public int RoleId { get; set; }
+        public bool IsActive { get; set; }
+    }
+    
+    STORED PROCEDURE: sp_UpdateUser (create this)
+    - Update user details
+    - Only hash password if provided (not null/empty)
+    
+    RESPONSE:
+    { "success": true, "message": "User updated successfully" }
+})
+.WithTags("Users")
+.WithName("UpdateUser");
+
+// ===============================================================
+// 5️⃣ DELETE USER (SOFT DELETE)
+// ===============================================================
+app.MapDelete("/api/users/delete/{id}", async (int id, IConfiguration config) =>
+{
+    STORED PROCEDURE: sp_DeleteUser (create this)
+    - Set IsActive = 0 (soft delete)
+    - Do NOT physically delete the record
+    
+    RESPONSE:
+    { "success": true, "message": "User deleted successfully" }
+})
+.WithTags("Users")
+.WithName("DeleteUser");
+
+═══════════════════════════════════════════════════════════════════════════════════
+FILE 2: RoleRoutes.cs
+═══════════════════════════════════════════════════════════════════════════════════
+
+// ===============================================================
+// 1️⃣ LIST ALL ROLES
+// ===============================================================
+app.MapGet("/api/roles/list", async (IConfiguration config) =>
+{
+    STORED PROCEDURE: sp_ListRoles (create this)
+    - Returns all active roles
+    - Optional: Include user count per role
+    
+    RESPONSE FORMAT:
+    [
+      {
+        "roleId": 1,
+        "roleName": "Administrator",
+        "description": "Full system access",
+        "isActive": true,
+        "userCount": 3  // Optional
+      }
+    ]
+})
+.WithTags("Roles")
+.WithName("ListRoles");
+
+// ===============================================================
+// 2️⃣ GET ROLE BY ID
+// ===============================================================
+app.MapGet("/api/roles/{id}", async (int id, IConfiguration config) =>
+{
+    STORED PROCEDURE: sp_GetRoleById (create this)
+    - Returns single role with details
+    
+    RESPONSE: Same as list but single object
+})
+.WithTags("Roles")
+.WithName("GetRole");
+
+// ===============================================================
+// 3️⃣ CREATE ROLE
+// ===============================================================
+app.MapPost("/api/roles/create", async ([FromBody] CreateRoleRequest request, IConfiguration config) =>
+{
+    REQUEST MODEL:
+    public class CreateRoleRequest
+    {
+        public string RoleName { get; set; }
+        public string Description { get; set; }
+    }
+    
+    STORED PROCEDURE: sp_CreateRole (create this)
+    - Insert role record
+    - Default IsActive = 1
+    
+    RESPONSE:
+    { "success": true, "roleId": 3, "message": "Role created successfully" }
+})
+.WithTags("Roles")
+.WithName("CreateRole");
+
+// ===============================================================
+// 4️⃣ UPDATE ROLE
+// ===============================================================
+app.MapPut("/api/roles/update", async ([FromBody] UpdateRoleRequest request, IConfiguration config) =>
+{
+    REQUEST MODEL:
+    public class UpdateRoleRequest
+    {
+        public int RoleId { get; set; }
+        public string RoleName { get; set; }
+        public string Description { get; set; }
+        public bool IsActive { get; set; }
+    }
+    
+    STORED PROCEDURE: sp_UpdateRole (create this)
+    - Update role details
+    
+    RESPONSE:
+    { "success": true, "message": "Role updated successfully" }
+})
+.WithTags("Roles")
+.WithName("UpdateRole");
+
+// ===============================================================
+// 5️⃣ DELETE ROLE (SOFT DELETE)
+// ===============================================================
+app.MapDelete("/api/roles/delete/{id}", async (int id, IConfiguration config) =>
+{
+    STORED PROCEDURE: sp_DeleteRole (create this)
+    - Set IsActive = 0
+    - Check if any users are assigned to this role first
+    - Prevent deletion if users exist (or reassign to default role)
+    
+    RESPONSE:
+    { "success": true, "message": "Role deleted successfully" }
+    or
+    { "success": false, "message": "Cannot delete role with active users" }
+})
+.WithTags("Roles")
+.WithName("DeleteRole");
+
+──────────────────────────────────────────────────────────────────────────────────
+🔧 IMPLEMENTATION GUIDELINES
+──────────────────────────────────────────────────────────────────────────────────
+
+MANDATORY PATTERN FROM DailyDeliveryRoutes.cs:
+
+1. FILE STRUCTURE:
+   using Microsoft.AspNetCore.Mvc;
+   using Microsoft.Data.SqlClient;
+   using System.Data;
+   using System.Text.Json;
+
+   namespace WebAPI.Routes
+   {
+       public static class UserRoutes
+       {
+           public static void MapUserRoutes(this WebApplication app)
+           {
+               // All endpoints here
+           }
+       }
+   }
+
+2. CONNECTION PATTERN:
+   using var conn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+   using var cmd = new SqlCommand("sp_StoredProcName", conn)
+   {
+       CommandType = CommandType.StoredProcedure
+   };
+
+3. ERROR HANDLING (MANDATORY):
+   try
+   {
+       // Implementation
+   }
+   catch (SqlException sqlEx)
+   {
+       Console.WriteLine($"SQL Error in EndpointName: {sqlEx.Message}");
+       return Results.Json(
+           new { success = false, errorCode = "SQL_ERROR", message = sqlEx.Message },
+           statusCode: 400);
+   }
+   catch (Exception ex)
+   {
+       Console.WriteLine($"Error in EndpointName: {ex.Message}");
+       return Results.Json(
+           new { success = false, errorCode = "GENERAL_ERROR", message = ex.Message },
+           statusCode: 500);
+   }
+
+4. READING RESULTS WITH SqlDataReader:
+   await conn.OpenAsync();
+   using var reader = await cmd.ExecuteReaderAsync();
+   
+   var list = new List<object>();
+   while (await reader.ReadAsync())
+   {
+       list.Add(new
+       {
+           userId = reader.GetInt32(reader.GetOrdinal("UserId")),
+           fullName = reader.GetString(reader.GetOrdinal("FullName")),
+           email = reader.GetString(reader.GetOrdinal("Email")),
+           roleId = reader.GetInt32(reader.GetOrdinal("RoleId")),
+           roleName = reader.GetString(reader.GetOrdinal("RoleName")),
+           isActive = reader.GetBoolean(reader.GetOrdinal("IsActive"))
+       });
+   }
+   return Results.Ok(list);
+
+──────────────────────────────────────────────────────────────────────────────────
+✅ ACCEPTANCE CRITERIA
+──────────────────────────────────────────────────────────────────────────────────
+
+CODE MUST:
+✅ Match DailyDeliveryRoutes.cs style EXACTLY
+✅ Use emoji section headers (1️⃣, 2️⃣, etc.)
+✅ Include comprehensive error handling for ALL endpoints
+✅ Use async/await throughout
+✅ Use SqlDataReader (not DataAdapter/DataTable)
+✅ Include .WithTags() and .WithName() for OpenAPI
+✅ Return proper HTTP status codes
+✅ Use Console.WriteLine for error logging
+
+──────────────────────────────────────────────────────────────────────────────────
+💡 SPECIAL NOTES
+──────────────────────────────────────────────────────────────────────────────────
+
+PASSWORD HASHING:
+- Use HASHBYTES('SHA2_256', @Password + @Salt) in SQL
+- Or use BCrypt in C# (recommended)
+- Never store plain text passwords
+
+SOFT DELETE:
+- Set IsActive = 0 instead of DELETE
+- Filter out inactive records in list queries (WHERE IsActive = 1)
+
+ROLE DELETION:
+- Check for users with this role before deleting
+- Prevent deletion if users exist (business rule)
+
+═══════════════════════════════════════════════════════════════════════════════════
+🎯 GENERATE THE CODE NOW
+═══════════════════════════════════════════════════════════════════════════════════
+
+Based on the above specifications and using DailyDeliveryRoutes.cs as the exact template,
+generate TWO complete files:
+1. UserRoutes.cs with 5 endpoints
+2. RoleRoutes.cs with 5 endpoints
+
+Then register them in Program.cs:
+app.MapUserRoutes();
+app.MapRoleRoutes();

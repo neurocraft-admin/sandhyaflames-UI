@@ -1,0 +1,508 @@
+═══════════════════════════════════════════════════════════════════════════════════
+🤖 GITHUB COPILOT PROMPT FOR VISUAL STUDIO
+   Backend API Implementation - Menu & Permission Routes
+═══════════════════════════════════════════════════════════════════════════════════
+
+📋 OBJECTIVE:
+Create MenuPermissionRoutes.cs following the EXACT architecture pattern from DailyDeliveryRoutes.cs
+Implement 5 API endpoints for role-based menu loading and permission management
+
+──────────────────────────────────────────────────────────────────────────────────
+📂 PROJECT CONTEXT
+──────────────────────────────────────────────────────────────────────────────────
+
+Namespace: WebAPI.Routes
+File Name: MenuPermissionRoutes.cs
+Architecture: .NET Core Minimal API with Dapper pattern
+Database: SQL Server with stored procedures
+Authentication: JWT Bearer tokens with claims (UserId, RoleId, Username)
+
+REFERENCE FILE TO FOLLOW:
+DailyDeliveryRoutes.cs - Use this as the EXACT template for:
+  ✅ Namespace and using statements
+  ✅ Static class with MapXxxRoutes extension method
+  ✅ SqlConnection + SqlCommand pattern
+  ✅ CommandType.StoredProcedure usage
+  ✅ Error handling (try-catch with SqlException + Exception)
+  ✅ Response format (Results.Ok, Results.BadRequest, Results.Json, Results.NotFound)
+  ✅ async/await pattern throughout
+  ✅ .WithTags() and .WithName() for OpenAPI documentation
+  ✅ Emoji-based section comments (e.g., // 1️⃣ ENDPOINT NAME)
+  ✅ DBNull.Value handling with (object?)value ?? DBNull.Value
+  ✅ SqlDataReader for reading results
+  ✅ Console.WriteLine for logging
+
+──────────────────────────────────────────────────────────────────────────────────
+🗄️ DATABASE SCHEMA (Already Created)
+──────────────────────────────────────────────────────────────────────────────────
+
+TABLE: Resources
+  - ResourceId INT PRIMARY KEY
+  - ResourceName NVARCHAR(100) - Example: "Dashboard", "Users", "Products"
+  - Description NVARCHAR(255)
+  - IconName NVARCHAR(50)
+  - DisplayOrder INT
+
+TABLE: MenuItems
+  - MenuItemId INT PRIMARY KEY
+  - Title NVARCHAR(100)
+  - Url NVARCHAR(255)
+  - IconName NVARCHAR(50)
+  - ParentMenuId INT (NULL for top-level, foreign key to self)
+  - DisplayOrder INT
+  - ResourceId INT (links to Resources table)
+  - SortPath NVARCHAR(255) - For hierarchical ordering (e.g., "0001", "0001.0001")
+
+TABLE: Permissions
+  - PermissionId INT PRIMARY KEY
+  - RoleId INT (foreign key to Roles table)
+  - ResourceId INT (foreign key to Resources table)
+  - CanView BIT
+  - CanCreate BIT
+  - CanUpdate BIT
+  - CanDelete BIT
+
+TABLE: MenuAccess
+  - MenuAccessId INT PRIMARY KEY
+  - RoleId INT
+  - MenuItemId INT
+
+──────────────────────────────────────────────────────────────────────────────────
+📦 STORED PROCEDURES (Already Created)
+──────────────────────────────────────────────────────────────────────────────────
+
+1. sp_GetMenuByRole
+   Input: @RoleId INT
+   Returns: 1 result set (ordered by SortPath)
+     - MenuItemId, Title, Url, IconName, ParentMenuId, DisplayOrder, SortPath
+
+2. sp_GetPermissionsByUserId
+   Input: @UserId INT
+   Returns: 2 result sets
+     Result Set 1 (User Info): UserId, Username, RoleId, RoleName
+     Result Set 2 (Permissions): ResourceId, ResourceName, CanView, CanCreate, CanUpdate, CanDelete
+
+3. sp_CheckPermission
+   Input: @UserId INT, @ResourceName NVARCHAR(100), @Action NVARCHAR(20)
+   Returns: 1 result set
+     - Allowed BIT
+
+4. sp_UpdateRolePermissions
+   Input: @RoleId INT, @ResourceId INT, @CanView BIT, @CanCreate BIT, @CanUpdate BIT, @CanDelete BIT
+   Returns: 1 result set
+     - success INT, message NVARCHAR(255)
+
+5. sp_GetRolesWithPermissions
+   Input: None
+   Returns: 1 result set
+     - RoleId, RoleName, TotalResources, ViewCount, CreateCount, UpdateCount, DeleteCount
+
+──────────────────────────────────────────────────────────────────────────────────
+🎯 API ENDPOINTS TO IMPLEMENT
+──────────────────────────────────────────────────────────────────────────────────
+
+// ===============================================================
+// 1️⃣ GET MENU FOR CURRENT USER
+// ===============================================================
+app.MapGet("/api/menu/current-user", async (HttpContext context, IConfiguration config) =>
+{
+    REQUIREMENTS:
+    - Get userId from JWT claims: context.User.FindFirst("UserId")?.Value
+    - Convert userId string to int
+    - Query Users table to get RoleId for this userId (use simple SELECT query)
+    - Call sp_GetMenuByRole with the RoleId
+    - Read results using SqlDataReader
+    - Build hierarchical structure: 
+      * Create list of MenuItemDto objects
+      * Each MenuItemDto should have: name, url, iconComponent (object with name property), children (array)
+      * Group items by ParentMenuId (null = top level)
+      * For top-level items, find all children where ParentMenuId = MenuItemId
+      * Recursively nest children
+    - Return hierarchical array matching INavData[] format for Angular CoreUI
+    
+    ERROR HANDLING:
+    - If userId claim missing: return Results.Unauthorized()
+    - If user not found: return Results.NotFound(new { success = false, message = "User not found" })
+    - Wrap in try-catch with SqlException and Exception handlers
+    - Use Console.WriteLine for error logging
+    - Return Results.Json with error details
+
+    RESPONSE FORMAT:
+    [
+      {
+        "name": "Dashboard",
+        "url": "/dashboard",
+        "iconComponent": { "name": "cilSpeedometer" },
+        "children": []
+      },
+      {
+        "name": "Admin",
+        "url": "/admin",
+        "iconComponent": { "name": "cilSettings" },
+        "children": [
+          { "name": "Users", "url": "/admin/users", "iconComponent": { "name": "cilPeople" } },
+          { "name": "Roles", "url": "/admin/roles", "iconComponent": { "name": "cilShieldAlt" } }
+        ]
+      }
+    ]
+})
+.WithTags("Menu & Permissions")
+.WithName("GetCurrentUserMenu");
+
+// ===============================================================
+// 2️⃣ GET PERMISSIONS FOR CURRENT USER
+// ===============================================================
+app.MapGet("/api/permissions/current-user", async (HttpContext context, IConfiguration config) =>
+{
+    REQUIREMENTS:
+    - Get userId from JWT claims
+    - Convert to int
+    - Call sp_GetPermissionsByUserId
+    - Use SqlDataReader with NextResult() to read 2 result sets
+    - First result: User info (userId, username, roleId, roleName)
+    - Second result: Permissions array (loop through all rows)
+    - Return combined object
+
+    RESPONSE FORMAT:
+    {
+      "userId": 1,
+      "username": "admin",
+      "roleId": 1,
+      "roleName": "Administrator",
+      "permissions": [
+        {
+          "resourceId": 1,
+          "resourceName": "Dashboard",
+          "canView": true,
+          "canCreate": false,
+          "canUpdate": false,
+          "canDelete": false
+        },
+        ...
+      ]
+    }
+})
+.WithTags("Menu & Permissions")
+.WithName("GetCurrentUserPermissions");
+
+// ===============================================================
+// 3️⃣ CHECK SINGLE PERMISSION
+// ===============================================================
+app.MapGet("/api/permissions/check", async (
+    HttpContext context,
+    [FromQuery] string resource,
+    [FromQuery] string action,
+    IConfiguration config) =>
+{
+    REQUIREMENTS:
+    - Get userId from JWT claims
+    - Validate resource and action parameters (not null/empty)
+    - Call sp_CheckPermission with @UserId, @ResourceName=resource, @Action=action
+    - Read single result row with "Allowed" column
+    - Return simple object with allowed flag
+
+    VALIDATION:
+    - If resource or action is null/empty: return Results.BadRequest(new { success = false, message = "Resource and action are required" })
+
+    RESPONSE FORMAT:
+    { "allowed": true }
+    or
+    { "allowed": false }
+})
+.WithTags("Menu & Permissions")
+.WithName("CheckPermission");
+
+// ===============================================================
+// 4️⃣ UPDATE ROLE PERMISSIONS (ADMIN ONLY)
+// ===============================================================
+app.MapPut("/api/permissions/role/{roleId}", async (
+    int roleId,
+    [FromBody] UpdateRolePermissionsRequest request,
+    IConfiguration config) =>
+{
+    REQUIREMENTS:
+    - Request body model:
+      public class UpdateRolePermissionsRequest
+      {
+          public int ResourceId { get; set; }
+          public bool CanView { get; set; }
+          public bool CanCreate { get; set; }
+          public bool CanUpdate { get; set; }
+          public bool CanDelete { get; set; }
+      }
+    - Call sp_UpdateRolePermissions with all parameters
+    - Read result: success (int), message (string)
+    - Return success/message object
+
+    RESPONSE FORMAT:
+    { "success": true, "message": "Permissions updated successfully" }
+    or
+    { "success": false, "message": "Error message" }
+})
+.WithTags("Menu & Permissions")
+.WithName("UpdateRolePermissions");
+
+// ===============================================================
+// 5️⃣ GET ROLES WITH PERMISSION SUMMARY (ADMIN VIEW)
+// ===============================================================
+app.MapGet("/api/roles/permissions", async (IConfiguration config) =>
+{
+    REQUIREMENTS:
+    - Call sp_GetRolesWithPermissions (no parameters)
+    - Read all rows using SqlDataReader
+    - Build array of role summary objects
+    - Each object: roleId, roleName, totalResources, viewCount, createCount, updateCount, deleteCount
+
+    RESPONSE FORMAT:
+    [
+      {
+        "roleId": 1,
+        "roleName": "Administrator",
+        "totalResources": 16,
+        "viewCount": 16,
+        "createCount": 16,
+        "updateCount": 16,
+        "deleteCount": 16
+      },
+      {
+        "roleId": 2,
+        "roleName": "Operator",
+        "totalResources": 8,
+        "viewCount": 8,
+        "createCount": 4,
+        "updateCount": 4,
+        "deleteCount": 0
+      }
+    ]
+})
+.WithTags("Menu & Permissions")
+.WithName("GetRolesWithPermissions");
+
+──────────────────────────────────────────────────────────────────────────────────
+📄 COMPLETE FILE STRUCTURE
+──────────────────────────────────────────────────────────────────────────────────
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using System.Data;
+using System.Text.Json;
+
+namespace WebAPI.Routes
+{
+    public static class MenuPermissionRoutes
+    {
+        public static void MapMenuPermissionEndpoints(this WebApplication app)
+        {
+            // 1️⃣ GET MENU FOR CURRENT USER
+            // ... implementation ...
+
+            // 2️⃣ GET PERMISSIONS FOR CURRENT USER
+            // ... implementation ...
+
+            // 3️⃣ CHECK SINGLE PERMISSION
+            // ... implementation ...
+
+            // 4️⃣ UPDATE ROLE PERMISSIONS (ADMIN ONLY)
+            // ... implementation ...
+
+            // 5️⃣ GET ROLES WITH PERMISSION SUMMARY
+            // ... implementation ...
+        }
+    }
+
+    // DTO Models
+    public class MenuItemDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Url { get; set; }
+        public IconComponent? IconComponent { get; set; }
+        public List<MenuItemDto>? Children { get; set; }
+    }
+
+    public class IconComponent
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+    public class UpdateRolePermissionsRequest
+    {
+        public int ResourceId { get; set; }
+        public bool CanView { get; set; }
+        public bool CanCreate { get; set; }
+        public bool CanUpdate { get; set; }
+        public bool CanDelete { get; set; }
+    }
+}
+
+──────────────────────────────────────────────────────────────────────────────────
+🔧 IMPLEMENTATION GUIDELINES
+──────────────────────────────────────────────────────────────────────────────────
+
+MANDATORY PATTERN FROM DailyDeliveryRoutes.cs:
+
+1. CONNECTION PATTERN:
+   using var conn = new SqlConnection(config.GetConnectionString("DefaultConnection"));
+   using var cmd = new SqlCommand("sp_StoredProcName", conn)
+   {
+       CommandType = CommandType.StoredProcedure
+   };
+
+2. PARAMETER PATTERN:
+   cmd.Parameters.AddWithValue("@ParamName", value);
+   cmd.Parameters.AddWithValue("@NullableParam", (object?)value ?? DBNull.Value);
+
+3. EXECUTION PATTERN:
+   await conn.OpenAsync();
+   using var reader = await cmd.ExecuteReaderAsync();
+
+4. READING RESULTS:
+   while (await reader.ReadAsync())
+   {
+       var item = new ClassName
+       {
+           Property = reader.GetInt32(reader.GetOrdinal("ColumnName")),
+           NullableProperty = reader.IsDBNull(reader.GetOrdinal("ColumnName"))
+               ? null
+               : reader.GetString(reader.GetOrdinal("ColumnName"))
+       };
+   }
+
+5. MULTIPLE RESULT SETS:
+   // First result set
+   if (await reader.ReadAsync()) { ... }
+   
+   // Move to second result set
+   await reader.NextResultAsync();
+   while (await reader.ReadAsync()) { ... }
+
+6. ERROR HANDLING (MANDATORY):
+   try
+   {
+       // Implementation
+   }
+   catch (SqlException sqlEx)
+   {
+       Console.WriteLine($"SQL Error in EndpointName: {sqlEx.Message}");
+       return Results.Json(
+           new { success = false, errorCode = "SQL_ERROR", message = sqlEx.Message },
+           statusCode: 400);
+   }
+   catch (Exception ex)
+   {
+       Console.WriteLine($"Error in EndpointName: {ex.Message}");
+       return Results.Json(
+           new { success = false, errorCode = "GENERAL_ERROR", message = ex.Message },
+           statusCode: 500);
+   }
+
+7. HIERARCHICAL MENU BUILDING ALGORITHM:
+   // Read all menu items from database into flat list
+   var allItems = new List<MenuItemDto>();
+   while (await reader.ReadAsync()) { ... }
+
+   // Separate top-level items (ParentMenuId is NULL)
+   var topLevelItems = allItems.Where(m => m.ParentMenuId == null).ToList();
+
+   // For each top-level item, find and attach children
+   foreach (var parent in topLevelItems)
+   {
+       parent.Children = allItems
+           .Where(m => m.ParentMenuId == parent.MenuItemId)
+           .OrderBy(m => m.DisplayOrder)
+           .ToList();
+   }
+
+   return Results.Ok(topLevelItems);
+
+8. JWT CLAIMS EXTRACTION:
+   var userIdClaim = context.User.FindFirst("UserId")?.Value;
+   if (string.IsNullOrEmpty(userIdClaim))
+   {
+       return Results.Unauthorized();
+   }
+   var userId = int.Parse(userIdClaim);
+
+9. USER ROLE LOOKUP (for Menu endpoint):
+   // After getting userId from claims, query Users table
+   using var userCmd = new SqlCommand("SELECT RoleId FROM Users WHERE UserId = @UserId", conn);
+   userCmd.Parameters.AddWithValue("@UserId", userId);
+   var roleIdObj = await userCmd.ExecuteScalarAsync();
+   if (roleIdObj == null)
+   {
+       return Results.NotFound(new { success = false, message = "User not found" });
+   }
+   var roleId = (int)roleIdObj;
+
+──────────────────────────────────────────────────────────────────────────────────
+✅ ACCEPTANCE CRITERIA
+──────────────────────────────────────────────────────────────────────────────────
+
+CODE MUST:
+✅ Match DailyDeliveryRoutes.cs style EXACTLY (indentation, spacing, comments)
+✅ Use emoji section headers (1️⃣, 2️⃣, etc.)
+✅ Include comprehensive error handling for ALL endpoints
+✅ Use async/await throughout
+✅ Handle DBNull values properly
+✅ Include .WithTags("Menu & Permissions") for all endpoints
+✅ Include unique .WithName() for each endpoint
+✅ Use SqlDataReader (not DataAdapter/DataTable)
+✅ Implement proper hierarchical menu building
+✅ Extract userId from JWT claims in authenticated endpoints
+✅ Return proper HTTP status codes (200 OK, 400 BadRequest, 401 Unauthorized, 404 NotFound, 500 InternalServerError)
+✅ Use Console.WriteLine for error logging
+✅ Include try-catch blocks with SqlException and generic Exception handlers
+
+──────────────────────────────────────────────────────────────────────────────────
+🚀 FINAL CHECKLIST BEFORE GENERATING CODE
+──────────────────────────────────────────────────────────────────────────────────
+
+□ Reviewed DailyDeliveryRoutes.cs structure
+□ Understood all 5 stored procedures and their result sets
+□ Ready to implement hierarchical menu building algorithm
+□ Will use SqlDataReader with GetOrdinal() pattern
+□ Will handle multiple result sets with NextResultAsync()
+□ Will extract JWT claims with context.User.FindFirst()
+□ Will include error handling for all endpoints
+□ Will use proper response formats (Results.Ok, Results.Json, etc.)
+□ Will add OpenAPI documentation (.WithTags, .WithName)
+□ Will match exact coding style from DailyDeliveryRoutes.cs
+
+──────────────────────────────────────────────────────────────────────────────────
+💡 SPECIAL NOTES
+──────────────────────────────────────────────────────────────────────────────────
+
+MENU HIERARCHY:
+- The database returns flat list with ParentMenuId
+- Top-level items have ParentMenuId = NULL
+- Children have ParentMenuId = parent's MenuItemId
+- SortPath ensures correct ordering (e.g., "0001", "0001.0001", "0001.0002")
+- Angular expects nested structure with children array
+
+PERMISSION CHECKING:
+- Action parameter values: "View", "Create", "Update", "Delete"
+- sp_CheckPermission validates against Permissions table
+- Returns simple BIT value (0 or 1)
+
+ADMIN ENDPOINTS:
+- Endpoints 4 & 5 are for admin role only
+- In future, add .RequireAuthorization("AdminOnly") policy
+- For now, implement without authorization check (will add later)
+
+DATABASE CONNECTION:
+- Use "DefaultConnection" connection string from appsettings.json
+- Same pattern as DailyDeliveryRoutes.cs: config.GetConnectionString("DefaultConnection")
+
+═══════════════════════════════════════════════════════════════════════════════════
+🎯 GENERATE THE CODE NOW
+═══════════════════════════════════════════════════════════════════════════════════
+
+Based on the above specifications and using DailyDeliveryRoutes.cs as the exact template,
+generate the complete MenuPermissionRoutes.cs file with all 5 endpoints implemented.
+
+Remember:
+- Follow DailyDeliveryRoutes.cs architecture EXACTLY
+- Include all error handling
+- Implement hierarchical menu building
+- Use SqlDataReader pattern
+- Add comprehensive comments
+- Include DTO classes at the end of the file
