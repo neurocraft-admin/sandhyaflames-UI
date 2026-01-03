@@ -280,11 +280,13 @@ deploy_backend() {
 create_api_service() {
     log_info "Creating systemd service..."
     
-    # Find the main DLL (assumes single .dll in publish folder)
-    API_DLL=$(find "$BACKEND_DEPLOY_PATH/publish" -maxdepth 1 -name "*.dll" ! -name "*.Views.dll" ! -name "*.PrecompiledViews.dll" | head -1)
+    # Find the main DLL by looking for .runtimeconfig.json (indicates entry point)
+    API_DLL=$(find "$BACKEND_DEPLOY_PATH/publish" -maxdepth 1 -name "*.runtimeconfig.json" | sed 's/\.runtimeconfig\.json$/.dll/')
     
-    if [ -z "$API_DLL" ]; then
+    if [ -z "$API_DLL" ] || [ ! -f "$API_DLL" ]; then
         log_error "Could not find API DLL in publish folder"
+        log_error "Contents of publish folder:"
+        ls -la "$BACKEND_DEPLOY_PATH/publish"
         exit 1
     fi
     
@@ -299,14 +301,13 @@ After=network.target mssql-server.service
 Type=notify
 User=www-data
 WorkingDirectory=$BACKEND_DEPLOY_PATH/publish
-ExecStart=/usr/local/bin/dotnet $API_DLL
+ExecStart=/usr/bin/dotnet $API_DLL --urls http://localhost:$API_PORT
 Restart=always
 RestartSec=10
 KillSignal=SIGINT
 SyslogIdentifier=sandhyaflames-api
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
-Environment=ASPNETCORE_URLS=http://localhost:$API_PORT
 
 [Install]
 WantedBy=multi-user.target
