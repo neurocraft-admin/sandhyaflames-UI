@@ -110,6 +110,13 @@
               <label class="form-label">Items</label>
               <input type="number" class="form-control" formControlName="noOfItems" />
             </div>
+
+            <!-- Remove Button -->
+            <div class="col-md-2">
+              <button *ngIf="permissions.canCreate && items.length > 1" type="button" class="btn btn-sm btn-danger" (click)="removeItemRow(i)">
+                ✕ Remove
+              </button>
+            </div>
           </div>
 
           <button *ngIf="permissions.canCreate" type="button" class="btn btn-sm btn-secondary mt-2" (click)="addItemRow()">
@@ -163,6 +170,7 @@
         <thead class="table-light">
           <tr>
             <th>Date</th>
+            <th>Vehicle</th>
             <th>Driver</th>
             <th>Status</th>
             <th>Actions</th>
@@ -171,6 +179,7 @@
         <tbody>
           <tr *ngFor="let d of paginatedDeliveries">
             <td>{{ d.DeliveryDate | date: 'dd-MM-yyyy' }}</td>
+            <td>{{ d.VehicleName || '-' }}</td>
             <td>{{ d.DriverName || '-' }}</td>
             <td>
               <span class="badge" [class.bg-success]="d.Status === 'Closed'" [class.bg-warning]="d.Status === 'Open'">
@@ -182,17 +191,13 @@
                 title="Recalculate planned items from delivery items (use after editing items or to populate initial metrics)">
                 Recompute
               </button>
-              <button *ngIf="permissions.canUpdate" class="btn btn-success btn-sm me-1" (click)="closeDelivery(d.DeliveryId)"
-                [disabled]="d.Status === 'Closed'">
-                Close
-              </button>
               <button *ngIf="permissions.canUpdate" class="btn btn-warning btn-sm" [routerLink]="['/DailyDeliveryUpdate', d.DeliveryId]">
                 Update
               </button>
             </td>
           </tr>
           <tr *ngIf="!paginatedDeliveries || paginatedDeliveries.length === 0">
-            <td colspan="4" class="text-center text-muted">
+            <td colspan="5" class="text-center text-muted">
               No deliveries found for selected filters.
             </td>
           </tr>

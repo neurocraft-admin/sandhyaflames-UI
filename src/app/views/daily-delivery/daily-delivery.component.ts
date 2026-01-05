@@ -65,7 +65,7 @@ export class DailyDeliveryComponent {
     startTime: ['08:00:00', Validators.required],
     returnTime: [null],
     remarks: [''],
-    hasCreditCustomers: [false],
+    hasCreditCustomers: [{ value: false, disabled: true }],
     items: this.fb.array([])
   });
 
@@ -81,6 +81,7 @@ export class DailyDeliveryComponent {
     next: d => {
       console.log('Driver API result:', d);
       this.drivers = d;
+      this.loadDeliveries(); // Load deliveries after drivers are loaded
     },
     error: e => console.error('Driver load error', e)
   });
@@ -93,7 +94,6 @@ export class DailyDeliveryComponent {
       }
     });
     this.addItemRow();
-    this.loadDeliveries(); // Load existing list
     this.loadPermissions(); // Load user permissions
   }
 
@@ -133,6 +133,13 @@ export class DailyDeliveryComponent {
 
   this.items.push(group);
 }
+
+  removeItemRow(index: number) {
+    if (this.items.length > 1) {
+      this.items.removeAt(index);
+    }
+  }
+
 // ✅ New lightweight safe wrapper
 onProductSelect(item: AbstractControl, event: Event) {
   const itemGroup = item as FormGroup;  // 👈 Safely cast inside TypeScript
@@ -336,6 +343,8 @@ onProductChange(itemGroup: FormGroup, product?: any) {
   loadDeliveries() {
     this.svc.list({}).subscribe({
       next: res => {
+        console.log('Deliveries from API:', res);
+        // Note: API doesn't return DriverId/DriverName - needs backend update
         this.deliveries = res || [];
         this.applyFilters();
       },

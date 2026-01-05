@@ -11,36 +11,41 @@
               {{ error }}
             </div>
 
-            <!-- Username -->
-            <div class="mb-3">
-              <label for="username" class="form-label">Username</label>
-              <input type="text"
-                     id="username"
-                     [(ngModel)]="username"
-                     class="form-control"
-                     placeholder="Enter username"
-                     required />
-            </div>
+            <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+              <!-- Username -->
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <div class="input-group">
+                  <input type="text"
+                         id="username"
+                         formControlName="username"
+                         class="form-control"
+                         placeholder="Enter username"
+                         required />
+                  <span class="input-group-text">@sandhyaflames.in</span>
+                </div>
+              </div>
 
-            <!-- Password -->
-            <div class="mb-3">
-              <label for="password" class="form-label">Password</label>
-              <input type="password"
-                     id="password"
-                     [(ngModel)]="password"
-                     class="form-control"
-                     placeholder="Enter password"
-                     required />
-            </div>
+              <!-- Password -->
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password"
+                       id="password"
+                       formControlName="password"
+                       class="form-control"
+                       placeholder="Enter password"
+                       required />
+              </div>
 
-            <!-- Submit -->
-            <div class="d-grid">
-              <button type="button"
-                      class="btn btn-primary"
-                      (click)="login()">
-                Login
-              </button>
-            </div>
+              <!-- Submit -->
+              <div class="d-grid">
+                <button type="submit"
+                        class="btn btn-primary"
+                        [disabled]="loginForm.invalid">
+                  Login
+                </button>
+              </div>
+            </form>
 
           </div>
         </div>
