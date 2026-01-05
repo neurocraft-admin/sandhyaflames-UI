@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -21,7 +22,7 @@ export class LoginComponent {
     private router: Router
   ) {
     this.loginForm = this.fb.group({
-      email: ['', [Validators.required, Validators.email]],
+      username: ['', Validators.required],
       password: ['', Validators.required]
     });
   }
@@ -29,7 +30,9 @@ export class LoginComponent {
   onSubmit() {
     if (this.loginForm.invalid) return;
 
-    const { email, password } = this.loginForm.value;
+    const { username, password } = this.loginForm.value;
+    const email = `${username}@${environment.emailDomain}`;
+    console.log('🔐 Attempting login with email:', email);
 
     this.auth.login(email, password).subscribe({
       next: (res: any) => {
