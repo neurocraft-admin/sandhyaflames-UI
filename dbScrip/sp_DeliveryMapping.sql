@@ -125,8 +125,7 @@ BEGIN
         ISNULL(SUM(m.MappedQty), 0) AS MappedCylinders,
         ISNULL(SUM(di.NoOfCylinders), 0) - ISNULL(SUM(m.MappedQty), 0) AS UnmappedCylinders
     FROM dbo.DailyDelivery dd
-    LEFT JOIN dbo.DailyDeliveryDrivers ddd ON dd.DeliveryId = ddd.DeliveryId
-    LEFT JOIN dbo.Drivers d ON ddd.DriverId = d.DriverId
+    LEFT JOIN dbo.Drivers d ON dd.DriverId = d.DriverId
     LEFT JOIN dbo.Vehicles v ON dd.VehicleId = v.VehicleId
     LEFT JOIN dbo.DailyDeliveryItems di ON dd.DeliveryId = di.DeliveryId
     LEFT JOIN dbo.Products p ON di.ProductId = p.ProductId
