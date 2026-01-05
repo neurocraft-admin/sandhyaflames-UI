@@ -187,6 +187,6 @@ export class DeliveryMappingComponent implements OnInit {
   }
 
   goBack() {
-    this.router.navigate(['/DailyDelivery']);
+    this.router.navigate(['/CommercialDeliveries']);
   }
 }

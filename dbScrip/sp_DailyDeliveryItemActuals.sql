@@ -92,9 +92,9 @@ BEGIN
     SELECT 
         di.DeliveryId,
         di.ProductId,
-        di.NoOfCylinders,
+        CASE WHEN di.NoOfCylinders > 0 THEN di.NoOfCylinders ELSE di.NoOfItems END,  -- Use NoOfItems for accessories
         0,  -- Initially 0 delivered
-        di.NoOfCylinders,  -- All pending initially
+        CASE WHEN di.NoOfCylinders > 0 THEN di.NoOfCylinders ELSE di.NoOfItems END,  -- All pending initially
         0,  -- No cash collected yet
         'Pending',
         GETDATE()
@@ -162,7 +162,7 @@ BEGIN
             SELECT 
                 @DeliveryId AS DeliveryId,
                 t.ProductId,
-                di.NoOfCylinders AS PlannedQuantity,
+                CASE WHEN di.NoOfCylinders > 0 THEN di.NoOfCylinders ELSE di.NoOfItems END AS PlannedQuantity,
                 t.DeliveredQuantity,
                 t.PendingQuantity,
                 t.CashCollected,

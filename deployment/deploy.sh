@@ -298,7 +298,7 @@ Description=Sandhya Flames .NET 9 WebAPI
 After=network.target mssql-server.service
 
 [Service]
-Type=notify
+Type=simple
 User=www-data
 WorkingDirectory=$BACKEND_DEPLOY_PATH/publish
 ExecStart=/usr/bin/dotnet $API_DLL --urls http://localhost:$API_PORT
