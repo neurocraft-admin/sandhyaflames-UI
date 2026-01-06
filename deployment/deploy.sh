@@ -304,6 +304,7 @@ WorkingDirectory=$BACKEND_DEPLOY_PATH/publish
 ExecStart=/usr/bin/dotnet $API_DLL --urls http://localhost:$API_PORT
 Restart=always
 RestartSec=10
+TimeoutStartSec=0
 KillSignal=SIGINT
 SyslogIdentifier=sandhyaflames-api
 Environment=ASPNETCORE_ENVIRONMENT=Production
