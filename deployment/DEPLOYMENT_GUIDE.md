@@ -79,30 +79,62 @@ dotnet --version  # Verify 9.0.x
 
 **IMPORTANT:** The deployment scripts are located in `~/deployment-scripts` on the VM. These scripts don't auto-update themselves, so you must manually sync them with GitHub before deploying.
 
-```bash
-# SSH into the VM
-ssh nnidh@34.14.178.225
+#### Workflow for Updating Deployment Scripts:
 
-# Navigate to deployment scripts directory
-cd ~/deployment-scripts
+1. **Make changes locally:**
+   - Edit `deploy.sh` or `rollback.sh` in your workspace: `d:\Workspace\Projects\Sandhya Flames\gas-agency-ui\deployment\`
 
-# Backup current scripts (optional)
-cp deploy.sh deploy.sh.backup
+2. **Commit and push to GitHub:**
+   ```bash
+   git add deployment/deploy.sh deployment/rollback.sh
+   git commit -m "Updated deployment scripts"
+   git push origin main
+   ```
 
-# Download latest deploy.sh from GitHub
-wget https://raw.githubusercontent.com/neurocraft-admin/sandhyaflames-UI/main/deployment/deploy.sh -O deploy.sh
+3. **Update on the VM** (choose ONE method):
 
-# Download latest rollback.sh from GitHub  
-wget https://raw.githubusercontent.com/neurocraft-admin/sandhyaflames-UI/main/deployment/rollback.sh -O rollback.sh
+   **Option A: Using WinSCP**
+   - Connect to VM: `34.14.178.225` (user: `nnidh`)
+   - Upload `deploy.sh` and `rollback.sh` to `~/deployment-scripts/`
+   - Set executable permissions via SSH: `chmod +x ~/deployment-scripts/*.sh`
 
-# Make them executable
-chmod +x deploy.sh rollback.sh
+   **Option B: Using SCP from local machine**
+   ```bash
+   scp deployment/deploy.sh nnidh@34.14.178.225:~/deployment-scripts/
+   scp deployment/rollback.sh nnidh@34.14.178.225:~/deployment-scripts/
+   ssh nnidh@34.14.178.225 "chmod +x ~/deployment-scripts/*.sh"
+   ```
 
-# Verify the update
-head -20 deploy.sh | grep -i "timeout"  # Should show TimeoutStartSec=0
-```
+   **Option C: Download directly on VM from GitHub**
+   ```bash
+   # SSH into the VM
+   ssh nnidh@34.14.178.225
+
+   # Navigate to deployment scripts directory
+   cd ~/deployment-scripts
+
+   # Backup current scripts (optional)
+   cp deploy.sh deploy.sh.backup
+
+   # Download latest scripts from GitHub
+   wget https://raw.githubusercontent.com/neurocraft-admin/sandhyaflames-UI/main/deployment/deploy.sh -O deploy.sh
+   wget https://raw.githubusercontent.com/neurocraft-admin/sandhyaflames-UI/main/deployment/rollback.sh -O rollback.sh
+
+   # Make them executable
+   chmod +x deploy.sh rollback.sh
+   ```
+
+4. **Verify the update:**
+   ```bash
+   # On the VM
+   cd ~/deployment-scripts
+   head -20 deploy.sh | grep "BRANCH"  # Should show current branch configuration
+   ls -l *.sh  # Verify executable permissions (-rwxr-xr-x)
+   ```
 
 **VM Deployment Scripts Location:** `~/deployment-scripts/`
+
+**Note:** The deployment scripts are stored separately in `~/deployment-scripts/` and are NOT automatically updated when you deploy the application. Always sync them manually after making changes.
 
 ---
 
