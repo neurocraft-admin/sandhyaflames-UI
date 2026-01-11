@@ -75,7 +75,11 @@ complete: () => this.loading.set(false)
 startCreate() {
 this.isEditing.set(true);
 this.editId = null;
-this.form.reset({ isActive: true });
+this.form.reset({ 
+  categoryId: null, 
+  subCategoryId: null, 
+  isActive: true 
+});
 this.subcategories = [];
 }
 startEdit(p: Product) {
