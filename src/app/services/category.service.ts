@@ -6,7 +6,7 @@ import { ProductCategory, ProductSubCategory } from '../models/category.model';
 import { environment } from '../../environments/environment';
 
 const CATEGORIES_URL = `${environment.apiUrl}/productcategories`;
-const SUBCATEGORIES_URL = `${environment.apiUrl}/api/productsubcategories`; // expects ?categoryId=ID
+const SUBCATEGORIES_URL = `${environment.apiUrl}/productsubcategories`; // expects ?categoryId=ID
 
 
 @Injectable({ providedIn: 'root' })
