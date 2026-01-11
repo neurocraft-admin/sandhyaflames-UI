@@ -22,6 +22,9 @@
 - **Backend:** /opt/sandhyaflames-api
 - **Service:** sandhyaflames-api.service
 - **Database:** localhost,1433 (sandhyaflames)
+- **Deployment Scripts:** ~/deployment-scripts (deploy.sh, rollback.sh)
+- **VM User:** nnidh
+- **VM IP:** 34.14.178.225
 
 ---
 
@@ -72,15 +75,46 @@ dotnet --version  # Verify 9.0.x
 
 ## 📦 DEPLOYMENT PROCESS
 
+### ⚠️ BEFORE EACH DEPLOYMENT - Update Deployment Scripts
+
+**IMPORTANT:** The deployment scripts are located in `~/deployment-scripts` on the VM. These scripts don't auto-update themselves, so you must manually sync them with GitHub before deploying.
+
+```bash
+# SSH into the VM
+ssh nnidh@34.14.178.225
+
+# Navigate to deployment scripts directory
+cd ~/deployment-scripts
+
+# Backup current scripts (optional)
+cp deploy.sh deploy.sh.backup
+
+# Download latest deploy.sh from GitHub
+wget https://raw.githubusercontent.com/neurocraft-admin/sandhyaflames-UI/main/deployment/deploy.sh -O deploy.sh
+
+# Download latest rollback.sh from GitHub  
+wget https://raw.githubusercontent.com/neurocraft-admin/sandhyaflames-UI/main/deployment/rollback.sh -O rollback.sh
+
+# Make them executable
+chmod +x deploy.sh rollback.sh
+
+# Verify the update
+head -20 deploy.sh | grep -i "timeout"  # Should show TimeoutStartSec=0
+```
+
+**VM Deployment Scripts Location:** `~/deployment-scripts/`
+
+---
+
 ### Method 1: Using Automated Script
 
-1. **Upload deployment scripts to VM:**
+1. **Upload deployment scripts to VM (First Time Only):**
 ```bash
 # From your local machine:
-scp -r deployment/* user@your-vm-ip:/home/user/deploy/
+scp -r deployment/* nnidh@34.14.178.225:~/deployment-scripts/
 
 # On VM:
-cd /home/user/deploy
+cd ~/deployment-scripts
 chmod +x deploy.sh rollback.sh
 ```
 
@@ -94,13 +128,16 @@ Edit `deploy.sh` and update:
 
 3. **Run deployment:**
 ```bash
-# Deploy both frontend and backend
+# IMPORTANT: First update the deployment scripts (see above section)
+cd ~/deployment-scripts
+
+# Then deploy both frontend and backend
 sudo ./deploy.sh all
 
-# Deploy only frontend
+# Or deploy only frontend
 sudo ./deploy.sh frontend
 
-# Deploy only backend
+# Or deploy only backend
 sudo ./deploy.sh backend
 ```
 
@@ -392,17 +429,28 @@ cat /opt/sandhya-api/publish/appsettings.Production.json
 
 ## 📝 DEPLOYMENT CHECKLIST
 
-- [ ] Backup current deployment
-- [ ] Update Git repositories (frontend + backend)
-- [ ] Build Angular app (`npm run build`)
-- [ ] Build .NET API (`dotnet publish`)
-- [ ] Run database migrations (if any)
-- [ ] Restart API service
-- [ ] Reload Nginx
+### Before Deployment:
+- [ ] **Update deployment scripts from GitHub** (see "BEFORE EACH DEPLOYMENT" section)
+- [ ] Verify scripts are latest version: `head -20 ~/deployment-scripts/deploy.sh | grep TimeoutStartSec`
+- [ ] SSH into VM: `ssh nnidh@34.14.178.225`
+- [ ] Navigate to: `cd ~/deployment-scripts`
+
+### During Deployment:
+- [ ] Run deployment: `sudo ./deploy.sh all`
+- [ ] Backup current deployment (automatic in script)
+- [ ] Update Git repositories (automatic - frontend + backend)
+- [ ] Build Angular app (automatic - `npm run build`)
+- [ ] Build .NET API (automatic - `dotnet publish`)
+- [ ] Run database migrations (manual if needed)
+- [ ] Restart API service (automatic)
+- [ ] Reload Nginx (automatic)
+
+### After Deployment:
 - [ ] Run health checks
-- [ ] Test frontend in browser
-- [ ] Test API endpoints
-- [ ] Monitor logs for errors
+- [ ] Test frontend in browser: http://34.14.178.225
+- [ ] Test API endpoints: http://34.14.178.225/api/health
+- [ ] Check service status: `sudo systemctl status sandhyaflames-api.service`
+- [ ] Monitor logs for errors: `sudo journalctl -u sandhyaflames-api.service -n 50`
 - [ ] Document deployment (version, date, changes)
 
 ---
