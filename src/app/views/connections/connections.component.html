@@ -1,0 +1,298 @@
+<div class="container-fluid">
+  <div class="mb-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h4 class="mb-1">
+        {{ isEditMode() ? 'Edit Connection' : 'New Connection' }}
+        <span *ngIf="isEditMode()" class="badge bg-warning ms-2">Edit Mode</span>
+      </h4>
+    </div>
+    <div class="d-flex gap-2">
+      <button cButton color="secondary" (click)="goBack()">
+        <i class="cil-arrow-left"></i> Back to List
+      </button>
+      <button cButton color="secondary" (click)="resetForm()" *ngIf="connectionItems.length > 2">
+        Reset Form
+      </button>
+    </div>
+  </div>
+
+  <!-- Connection Type Info Banner -->
+  <div class="alert mb-3" [class]="connectionTypeAlertClass" role="alert">
+    <div class="d-flex align-items-center">
+      <span class="fs-4 me-3">{{ connectionTypeIcon }}</span>
+      <div>
+        <h5 class="alert-heading mb-1">{{ connectionTypeName }}</h5>
+        <p class="mb-0">{{ connectionTypeDescription }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection Form Card -->
+  <div class="card mb-4" [class]="connectionTypeCardClass">
+    <div class="card-header">
+      <strong>{{ connectionTypeName }} - Details</strong>
+    </div>
+    <div class="card-body">
+      <form [formGroup]="connectionForm">
+        <!-- Row 1: Connection Type and Customer -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Connection Type *</label>
+            <select class="form-select" formControlName="connectionType">
+              <option value="NewConnection">New Connection</option>
+              <option value="ConnectionTransfer">Connection Transfer</option>
+              <option value="CylinderSurrender">Cylinder Surrender</option>
+            </select>
+          </div>
+
+          <div class="col-md-8">
+            <label class="form-label">Customer Name *</label>
+            <select class="form-select" formControlName="customerId">
+              <option [ngValue]="0">-- Select Customer --</option>
+              <option *ngFor="let c of customers" [ngValue]="c.customerId">
+                {{ c.customerName }} - {{ c.contactNumber }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Row 2: Product Selection and Add Button -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-5">
+            <label class="form-label">Select Product</label>
+            <select class="form-select" formControlName="productId">
+              <option [ngValue]="0">-- Select Product --</option>
+              <optgroup label="Products">
+                <option *ngFor="let p of products" [ngValue]="p.productId">
+                  {{ p.productName }} - ₹{{ p.unitPrice || 0 }}
+                </option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Quantity</label>
+            <input 
+              type="number" 
+              class="form-control" 
+              formControlName="quantity" 
+              min="1"
+              placeholder="Qty"
+            />
+          </div>
+
+          <div class="col-md-2 d-flex align-items-end">
+            <button 
+              type="button" 
+              cButton 
+              color="primary" 
+              class="w-100"
+              (click)="addProduct()"
+            >
+              Add Product
+            </button>
+          </div>
+        </div>
+
+        <!-- Connection Items Grid -->
+        <div class="row mb-3">
+          <div class="col-12">
+            <label class="form-label">Connection Items</label>
+            <div class="table-responsive">
+              <table class="table table-bordered table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 5%">#</th>
+                    <th style="width: 35%">Item Name</th>
+                    <th style="width: 15%" class="text-center">Price (₹)</th>
+                    <th style="width: 15%" class="text-center">Quantity</th>
+                    <th style="width: 20%" class="text-end">Total Amount (₹)</th>
+                    <th style="width: 10%" class="text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let item of connectionItems; let i = index">
+                    <td class="text-center">{{ i + 1 }}</td>
+                    <td>
+                      <strong>{{ item.itemName }}</strong>
+                      <span 
+                        class="badge ms-2"
+                        [class.bg-info]="item.itemType === 'product'"
+                        [class.bg-warning]="item.itemType === 'service'"
+                        [class.bg-success]="item.itemType === 'deposit'"
+                      >
+                        {{ item.itemType === 'product' ? 'Product' : 
+                           item.itemType === 'service' ? 'Service' : 'Deposit' }}
+                      </span>
+                    </td>
+                    <td class="text-center">
+                      <!-- Editable for service charge and deposit, read-only for products -->
+                      <input 
+                        *ngIf="item.itemType === 'service' || item.itemType === 'deposit'"
+                        type="number" 
+                        class="form-control form-control-sm text-center" 
+                        [value]="item.price"
+                        (input)="updateCustomAmount(i, $any($event.target).value)"
+                        min="0"
+                        step="0.01"
+                      />
+                      <span *ngIf="item.itemType === 'product'">
+                        {{ item.price | number: '1.2-2' }}
+                      </span>
+                    </td>
+                    <td class="text-center">
+                      <!-- Editable quantity for products -->
+                      <input 
+                        *ngIf="item.itemType === 'product'"
+                        type="number" 
+                        class="form-control form-control-sm text-center" 
+                        [value]="item.quantity"
+                        (input)="updateQuantity(i, $any($event.target).value)"
+                        min="1"
+                      />
+                      <span *ngIf="item.itemType !== 'product'">1</span>
+                    </td>
+                    <td class="text-end">
+                      <strong>{{ item.totalAmount | number: '1.2-2' }}</strong>
+                    </td>
+                    <td class="text-center">
+                      <button 
+                        *ngIf="item.itemType === 'product'"
+                        type="button"
+                        cButton 
+                        size="sm" 
+                        color="danger"
+                        (click)="removeItem(i)"
+                        title="Remove item"
+                      >
+                        ✕
+                      </button>
+                      <span 
+                        *ngIf="item.itemType !== 'product'" 
+                        class="text-muted"
+                      >
+                        —
+                      </span>
+                    </td>
+                  </tr>
+                  <tr *ngIf="connectionItems.length === 0" class="table-light">
+                    <td colspan="6" class="text-center text-muted py-4">
+                      No items added yet. Please add products to the connection.
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot class="table-secondary">
+                  <tr>
+                    <td colspan="4" class="text-end">
+                      <strong>Total Amount:</strong>
+                    </td>
+                    <td class="text-end">
+                      <strong class="fs-5 text-primary">
+                        ₹{{ totalAmount | number: '1.2-2' }}
+                      </strong>
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row">
+          <div class="col-12">
+            <div class="d-flex gap-2 justify-content-end">
+              <button 
+                type="button" 
+                cButton 
+                color="success" 
+                size="lg"
+                (click)="saveConnection()"
+                [disabled]="loading()"
+              >
+                <span *ngIf="loading()" class="spinner-border spinner-border-sm me-2"></span>
+                Save Connection
+              </button>
+              
+              <button 
+                type="button" 
+                cButton 
+                color="warning" 
+                size="lg"
+                (click)="editConnection()"
+                [disabled]="loading() || !isEditMode()"
+              >
+                Edit
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dynamic Information Panel -->
+  <div class="card" [class]="connectionTypeCardClass">
+    <div class="card-body">
+      <h6 class="card-title" [class]="connectionTypeTextClass">
+        <i class="cil-info"></i> {{ connectionTypeName }} - Process
+      </h6>
+      <div [ngSwitch]="connectionForm.get('connectionType')?.value">
+        <!-- New Connection Instructions -->
+        <div *ngSwitchCase="'NewConnection'">
+          <p class="mb-2"><strong>What happens:</strong></p>
+          <ul class="mb-3">
+            <li>✅ Stock: <strong>Filled Stock REDUCED</strong> (cylinder given to customer)</li>
+            <li>💵 Income: <strong>Service Charge</strong> collected from customer</li>
+            <li>💵 Income: <strong>Deposit Amount</strong> collected from customer</li>
+          </ul>
+          <p class="mb-2"><strong>Steps:</strong></p>
+          <ol class="mb-0">
+            <li>Select customer receiving the new connection</li>
+            <li>Add product (cylinder type) they are receiving</li>
+            <li>Enter Service Charge amount (if applicable)</li>
+            <li>Enter Deposit amount collected from customer</li>
+            <li>Save to record the new connection</li>
+          </ol>
+        </div>
+
+        <!-- Connection Transfer Instructions -->
+        <div *ngSwitchCase="'ConnectionTransfer'">
+          <p class="mb-2"><strong>What happens:</strong></p>
+          <ul class="mb-3">
+            <li>🔄 Stock: <strong>Empty Stock INCREASED</strong> (cylinder returned by customer)</li>
+            <li>💵 Income: <strong>Service Charge</strong> collected for transfer</li>
+            <li>💸 Expense: <strong>Deposit Refund</strong> paid back to customer</li>
+          </ul>
+          <p class="mb-2"><strong>Steps:</strong></p>
+          <ol class="mb-0">
+            <li>Select customer who is transferring/returning connection</li>
+            <li>Add product (cylinder type) being returned</li>
+            <li>Enter Service Charge for processing transfer (can be 0)</li>
+            <li>Enter Deposit Amount to refund to customer</li>
+            <li>Save to record the transfer and refund deposit</li>
+          </ol>
+        </div>
+
+        <!-- Cylinder Surrender Instructions -->
+        <div *ngSwitchCase="'CylinderSurrender'">
+          <p class="mb-2"><strong>What happens:</strong></p>
+          <ul class="mb-3">
+            <li>🔚 Stock: <strong>Empty Stock INCREASED</strong> (cylinder returned by customer)</li>
+            <li>💵 Income: <strong>Service Charge</strong> collected for surrender process</li>
+            <li>💸 Expense: <strong>Deposit Refund</strong> paid back to customer</li>
+          </ul>
+          <p class="mb-2"><strong>Steps:</strong></p>
+          <ol class="mb-0">
+            <li>Select customer who is surrendering connection permanently</li>
+            <li>Add product (cylinder type) being returned</li>
+            <li>Enter Service Charge for processing surrender (can be 0)</li>
+            <li>Enter Deposit Amount to refund to customer</li>
+            <li>Save to record the surrender and refund deposit</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

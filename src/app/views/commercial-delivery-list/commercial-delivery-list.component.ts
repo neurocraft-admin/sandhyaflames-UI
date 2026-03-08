@@ -35,7 +35,7 @@ export class CommercialDeliveryListComponent implements OnInit {
   loading = signal<boolean>(false);
 
   // Filter & Pagination
-  fromDate: string = this.today();
+  fromDate: string = this.yesterday();
   toDate: string = this.today();
   currentPage: number = 1;
   pageSize: number = 10;
@@ -97,7 +97,8 @@ export class CommercialDeliveryListComponent implements OnInit {
       filtered = filtered.filter(d => {
         const deliveryDateValue = d.DeliveryDate || d.deliveryDate;
         if (!deliveryDateValue) return false;
-        const deliveryDate = new Date(deliveryDateValue).toISOString().substring(0, 10);
+        // Extract just the date part (YYYY-MM-DD) to avoid timezone issues
+        const deliveryDate = deliveryDateValue.substring(0, 10);
         const matchesFrom = !this.fromDate || deliveryDate >= this.fromDate;
         const matchesTo = !this.toDate || deliveryDate <= this.toDate;
         return matchesFrom && matchesTo;
@@ -137,13 +138,19 @@ export class CommercialDeliveryListComponent implements OnInit {
 
   /* Clear filters */
   clearFilters() {
-    this.fromDate = this.today();
+    this.fromDate = this.yesterday();
     this.toDate = this.today();
     this.applyFilters();
   }
 
   private today() {
     return new Date().toISOString().substring(0, 10);
+  }
+
+  private yesterday() {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    return date.toISOString().substring(0, 10);
   }
 
   mapCustomers(deliveryId: number): void {

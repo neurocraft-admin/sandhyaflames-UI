@@ -1,0 +1,198 @@
+<!-- Modal Backdrop -->
+<div *ngIf="show" class="modal-backdrop" (click)="onBackdropClick($event)">
+  <!-- Modal Container -->
+  <div class="modal-container modal-lg" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <h5 class="modal-title">
+        <i class="bi bi-people-fill me-2"></i>
+        Map Credit to Customers
+      </h5>
+      <button type="button" class="btn-close" (click)="onClose()" aria-label="Close"></button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="modal-body">
+      <!-- Product & Credit Info -->
+      <div class="alert alert-info">
+        <div class="row">
+          <div class="col-md-8">
+            <strong>Product:</strong> {{ data.productName }}
+          </div>
+          <div class="col-md-4 text-end">
+            <strong>Credit Amount:</strong> 
+            <span class="badge bg-danger fs-6 ms-2">₹ {{ expectedTotal | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mappings Form -->
+      <form [formGroup]="mappingForm">
+        <div formArrayName="mappings">
+          <div *ngFor="let mapping of mappings.controls; let i = index" 
+               [formGroupName]="i" 
+               class="mapping-row mb-3 p-3 border rounded">
+            <div class="row g-3 align-items-end">
+              <!-- Customer Selection -->
+              <div class="col-md-5">
+                <label class="form-label">
+                  <i class="bi bi-person me-1"></i>
+                  Select Customer *
+                </label>
+                <select 
+                  class="form-select" 
+                  formControlName="customerId"
+                  (change)="onCustomerChange(i)">
+                  <option [value]="0">-- Select Customer --</option>
+                  <option *ngFor="let customer of customers" [value]="customer.customerId">
+                    {{ customer.customerName }}
+                  </option>
+                </select>
+                <div *ngIf="mapping.get('customerId')?.invalid && mapping.get('customerId')?.touched" 
+                     class="text-danger small mt-1">
+                  Customer is required
+                </div>
+              </div>
+
+              <!-- Amount -->
+              <div class="col-md-3">
+                <label class="form-label">
+                  <i class="bi bi-currency-rupee me-1"></i>
+                  Amount *
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text">₹</span>
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    formControlName="amount"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0.00"
+                    (input)="onAmountChange()"
+                  >
+                </div>
+                <div *ngIf="mapping.get('amount')?.invalid && mapping.get('amount')?.touched" 
+                     class="text-danger small mt-1">
+                  Amount must be greater than 0
+                </div>
+              </div>
+
+              <!-- Invoice Number -->
+              <div class="col-md-3">
+                <label class="form-label">
+                  <i class="bi bi-receipt me-1"></i>
+                  Invoice # (Optional)
+                </label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  formControlName="invoiceNumber"
+                  placeholder="INV-001"
+                >
+              </div>
+
+              <!-- Remove Button -->
+              <div class="col-md-1">
+                <button 
+                  type="button" 
+                  class="btn btn-outline-danger btn-sm w-100"
+                  (click)="removeMapping(i)"
+                  [disabled]="mappings.length === 1"
+                  title="Remove this mapping">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add More Button -->
+        <div class="text-center mb-3">
+          <button 
+            type="button" 
+            class="btn btn-outline-primary btn-sm"
+            (click)="addMapping()">
+            <i class="bi bi-plus-circle me-1"></i>
+            Add Another Customer
+          </button>
+        </div>
+      </form>
+
+      <hr>
+
+      <!-- Summary & Validation -->
+      <div class="credit-summary">
+        <div class="row mb-2">
+          <div class="col-6 text-muted">Total Credit Amount:</div>
+          <div class="col-6 text-end">
+            <strong>₹ {{ expectedTotal | number:'1.2-2' }}</strong>
+          </div>
+        </div>
+        
+        <div class="row mb-2">
+          <div class="col-6 text-muted">Total Mapped:</div>
+          <div class="col-6 text-end">
+            <strong [class.text-danger]="!isValid" [class.text-success]="isValid">
+              ₹ {{ totalMapped | number:'1.2-2' }}
+            </strong>
+          </div>
+        </div>
+
+        <div class="row mb-2" *ngIf="difference !== 0">
+          <div class="col-6 text-muted">Remaining:</div>
+          <div class="col-6 text-end">
+            <strong [class.text-danger]="difference !== 0" [class.text-success]="difference === 0">
+              {{ difference > 0 ? '+' : '' }}₹ {{ Math.abs(difference) | number:'1.2-2' }}
+            </strong>
+          </div>
+        </div>
+
+        <!-- Validation Error -->
+        <div *ngIf="validationError" class="alert alert-danger mt-3 mb-0" role="alert">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          {{ validationError }}
+        </div>
+
+        <!-- Success Message -->
+        <div *ngIf="isValid" class="alert alert-success mt-3 mb-0" role="alert">
+          <i class="bi bi-check-circle-fill me-2"></i>
+          Credit amount fully mapped to customers
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="modal-footer">
+      <button 
+        type="button" 
+        class="btn btn-sm btn-outline-primary" 
+        (click)="autoDistribute()"
+        *ngIf="difference > 0"
+        title="Auto-fill remaining amount">
+        <i class="bi bi-magic me-1"></i>
+        Auto Fill
+      </button>
+
+      <div class="flex-grow-1"></div>
+
+      <button 
+        type="button" 
+        class="btn btn-secondary" 
+        (click)="onClose()"
+        [disabled]="loading()">
+        Cancel
+      </button>
+      
+      <button 
+        type="button" 
+        class="btn btn-success" 
+        (click)="onSave()"
+        [disabled]="!isValid || loading()">
+        <span *ngIf="loading()" class="spinner-border spinner-border-sm me-1"></span>
+        <i *ngIf="!loading()" class="bi bi-check-lg me-1"></i>
+        {{ loading() ? 'Saving...' : 'Save Mappings' }}
+      </button>
+    </div>
+  </div>
+</div>

@@ -93,4 +93,16 @@ closeDeliveryWithItems(deliveryId: number, request: CloseDeliveryWithItemsReques
   );
 }
 
+/* Validate credit mappings for delivery */
+validateCreditMappings(deliveryId: number, productId?: number): Observable<any> {
+  const params: Record<string, string> = {};
+  if (productId) {
+    params['productId'] = productId.toString();
+  }
+  return this.http.get<any>(
+    `${URL}/${deliveryId}/validate-credit`,
+    { params }
+  );
+}
+
 }

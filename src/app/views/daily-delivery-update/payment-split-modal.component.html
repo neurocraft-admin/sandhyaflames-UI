@@ -1,0 +1,212 @@
+<!-- Modal Backdrop -->
+<div *ngIf="show" class="modal-backdrop" (click)="onBackdropClick($event)">
+  <!-- Modal Container -->
+  <div class="modal-container" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <h5 class="modal-title">
+        <i class="bi bi-credit-card me-2"></i>
+        Payment Split
+      </h5>
+      <button type="button" class="btn-close" (click)="onClose()" aria-label="Close"></button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="modal-body">
+      <!-- Product Info -->
+      <div class="product-info mb-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="text-muted">Product:</span>
+          <strong>{{ data.productName }}</strong>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          <span class="text-muted">Total Amount:</span>
+          <strong class="text-primary fs-5">₹ {{ expectedTotal | number:'1.2-2' }}</strong>
+        </div>
+      </div>
+
+      <hr>
+
+      <!-- Payment Split Form -->
+      <form [formGroup]="splitForm">
+        <div class="row g-3">
+          <!-- Cash -->
+          <div class="col-md-6">
+            <label class="form-label">
+              <i class="bi bi-cash-stack text-success me-2"></i>
+              Cash Amount
+            </label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input 
+                type="number" 
+                class="form-control" 
+                formControlName="cash"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+              >
+            </div>
+          </div>
+
+          <!-- UPI -->
+          <div class="col-md-6">
+            <label class="form-label">
+              <i class="bi bi-phone text-info me-2"></i>
+              UPI Amount
+            </label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input 
+                type="number" 
+                class="form-control" 
+                formControlName="upi"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+              >
+            </div>
+          </div>
+
+          <!-- Card -->
+          <div class="col-md-6">
+            <label class="form-label">
+              <i class="bi bi-credit-card text-warning me-2"></i>
+              Card Amount
+            </label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input 
+                type="number" 
+                class="form-control" 
+                formControlName="card"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+              >
+            </div>
+          </div>
+
+          <!-- Bank Transfer -->
+          <div class="col-md-6">
+            <label class="form-label">
+              <i class="bi bi-bank text-primary me-2"></i>
+              Bank Transfer
+            </label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input 
+                type="number" 
+                class="form-control" 
+                formControlName="bank"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+              >
+            </div>
+          </div>
+
+          <!-- Credit -->
+          <div class="col-md-6">
+            <label class="form-label">
+              <i class="bi bi-person-badge text-danger me-2"></i>
+              Credit Amount
+              <small class="text-muted">(Requires customer mapping)</small>
+            </label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input 
+                type="number" 
+                class="form-control" 
+                formControlName="credit"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+              >
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <hr>
+
+      <!-- Summary & Validation -->
+      <div class="split-summary">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted">Split Total:</span>
+          <strong [class.text-danger]="!isValid" [class.text-success]="isValid">
+            ₹ {{ currentTotal | number:'1.2-2' }}
+          </strong>
+        </div>
+        
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted">Expected Total:</span>
+          <strong>₹ {{ expectedTotal | number:'1.2-2' }}</strong>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center" *ngIf="difference !== 0">
+          <span class="text-muted">Difference:</span>
+          <strong [class.text-danger]="difference !== 0" [class.text-success]="difference === 0">
+            {{ difference > 0 ? '+' : '' }}₹ {{ difference | number:'1.2-2' }}
+          </strong>
+        </div>
+
+        <!-- Validation Error -->
+        <div *ngIf="validationError" class="alert alert-danger mt-3 mb-0" role="alert">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          {{ validationError }}
+        </div>
+
+        <!-- Success Message -->
+        <div *ngIf="isValid && currentTotal > 0" class="alert alert-success mt-3 mb-0" role="alert">
+          <i class="bi bi-check-circle-fill me-2"></i>
+          Payment split is valid
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="modal-footer">
+      <button 
+        type="button" 
+        class="btn btn-sm btn-outline-secondary" 
+        (click)="clearAll()"
+        title="Clear all fields"
+      >
+        <i class="bi bi-trash me-1"></i>
+        Clear All
+      </button>
+      
+      <button 
+        type="button" 
+        class="btn btn-sm btn-outline-primary" 
+        (click)="autoDistribute()"
+        *ngIf="difference > 0"
+        title="Auto-fill remaining amount"
+      >
+        <i class="bi bi-magic me-1"></i>
+        Auto Fill
+      </button>
+
+      <div class="flex-grow-1"></div>
+
+      <button 
+        type="button" 
+        class="btn btn-secondary" 
+        (click)="onClose()"
+      >
+        Cancel
+      </button>
+      
+      <button 
+        type="button" 
+        class="btn btn-primary" 
+        (click)="onSave()"
+        [disabled]="!isValid || splitForm.invalid"
+      >
+        <i class="bi bi-check-lg me-1"></i>
+        Save Split
+      </button>
+    </div>
+  </div>
+</div>

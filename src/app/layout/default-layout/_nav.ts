@@ -118,6 +118,12 @@ export const navItems: AppNavData[] = [
     title: false
   },
   {
+    name: 'Connections',
+    url: '/connections',
+    iconComponent: { name: 'cil-link' },
+    title: false
+  },
+  {
     title: true,
     name: 'Admin'
   },

@@ -51,7 +51,7 @@ export class DailyDeliveryComponent {
   isEditing = signal(true);
   
   // Filter & Pagination
-  fromDate: string = this.today();
+  fromDate: string = this.yesterday();
   toDate: string = this.today();
   filterStatus: string = 'Open';
   currentPage: number = 1;
@@ -359,7 +359,8 @@ onProductChange(itemGroup: FormGroup, product?: any) {
     // Filter by date range
     if (this.fromDate || this.toDate) {
       filtered = filtered.filter(d => {
-        const deliveryDate = new Date(d.DeliveryDate).toISOString().substring(0, 10);
+        // Extract just the date part (YYYY-MM-DD) to avoid timezone issues
+        const deliveryDate = d.DeliveryDate.substring(0, 10);
         const matchesFrom = !this.fromDate || deliveryDate >= this.fromDate;
         const matchesTo = !this.toDate || deliveryDate <= this.toDate;
         return matchesFrom && matchesTo;
@@ -397,7 +398,7 @@ onProductChange(itemGroup: FormGroup, product?: any) {
 
   /* Clear filters */
   clearFilters() {
-    this.fromDate = this.today();
+    this.fromDate = this.yesterday();
     this.toDate = this.today();
     this.filterStatus = 'Open';
     this.applyFilters();
@@ -445,5 +446,11 @@ onProductChange(itemGroup: FormGroup, product?: any) {
 
   private today() {
     return new Date().toISOString().substring(0, 10);
+  }
+
+  private yesterday() {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    return date.toISOString().substring(0, 10);
   }
 }
