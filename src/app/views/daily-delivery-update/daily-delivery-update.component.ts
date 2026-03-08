@@ -29,6 +29,10 @@ export class DailyDeliveryUpdateComponent implements OnInit {
   
   form!: FormGroup;
 
+  // ✅ NEW: Delivery charge state
+  hasDeliveryCharge = signal<boolean>(false);
+  deliveryChargeAmount = signal<number>(0);
+
   // Payment split modal state
   showPaymentSplitModal = signal<boolean>(false);
   currentPaymentSplitIndex: number = -1;
@@ -53,7 +57,18 @@ export class DailyDeliveryUpdateComponent implements OnInit {
     this.form = this.fb.group({
       returnTime: ['', Validators.required],
       remarks: [''],
-      items: this.fb.array([])
+      items: this.fb.array([]),
+      // ✅ NEW: Delivery charge fields
+      deliveryCharge: this.fb.group({
+        chargeAmount: [0, [Validators.min(0)]],
+        paymentSplit: this.fb.group({
+          cash: [0],
+          upi: [0],
+          card: [0],
+          bank: [0]
+        }),
+        remarks: ['']
+      })
     });
 
     this.loadDeliveryData();
@@ -212,6 +227,12 @@ export class DailyDeliveryUpdateComponent implements OnInit {
   }
 
   savePaymentSplit(breakdown: PaymentSplitBreakdown): void {
+    // ✅ Check if this is delivery charge payment split
+    if (this.currentPaymentSplitIndex === -2) {
+      this.saveDeliveryChargePaymentSplit(breakdown);
+      return;
+    }
+
     if (this.currentPaymentSplitIndex < 0) return;
 
     const item = this.itemsFormArray.at(this.currentPaymentSplitIndex);
@@ -236,12 +257,71 @@ export class DailyDeliveryUpdateComponent implements OnInit {
     return Math.abs(cashCollected - splitTotal) < 0.01;
   }
 
+  // ✅ NEW: Delivery Charge Payment Split Methods
+  openDeliveryChargePaymentSplit(): void {
+    const chargeAmount = this.form.get('deliveryCharge.chargeAmount')?.value || 0;
+
+    if (chargeAmount <= 0) {
+      this.toast.error('Please enter delivery charge amount before setting payment split');
+      return;
+    }
+
+    this.currentPaymentSplitIndex = -2; // Special index for delivery charge
+    
+    const originalSplit = this.form.get('deliveryCharge.paymentSplit')?.value;
+    const clonedSplit = originalSplit ? {
+      cash: originalSplit.cash || 0,
+      upi: originalSplit.upi || 0,
+      card: originalSplit.card || 0,
+      bank: originalSplit.bank || 0,
+      credit: 0 // ✅ Delivery charge does NOT support credit
+    } : undefined;
+    
+    this.paymentSplitModalData = {
+      productName: 'Delivery Charge',
+      totalAmount: chargeAmount,
+      currentSplit: clonedSplit,
+      disableCredit: true // ✅ NEW: Flag to disable credit in modal
+    };
+    this.showPaymentSplitModal.set(true);
+  }
+
+  saveDeliveryChargePaymentSplit(breakdown: PaymentSplitBreakdown): void {
+    // Remove credit from breakdown (should be 0 anyway)
+    const cleanBreakdown = {
+      cash: breakdown.cash || 0,
+      upi: breakdown.upi || 0,
+      card: breakdown.card || 0,
+      bank: breakdown.bank || 0
+    };
+
+    this.form.get('deliveryCharge.paymentSplit')?.patchValue(cleanBreakdown);
+    this.toast.success('Delivery charge payment split saved');
+    this.closePaymentSplitModal();
+  }
+
+  hasDeliveryChargePaymentSplit(): boolean {
+    const split = this.form.get('deliveryCharge.paymentSplit')?.value;
+    return (split.cash + split.upi + split.card + split.bank) > 0;
+  }
+
+  isDeliveryChargePaymentSplitValid(): boolean {
+    const chargeAmount = this.form.get('deliveryCharge.chargeAmount')?.value || 0;
+    const split = this.form.get('deliveryCharge.paymentSplit')?.value;
+    const splitTotal = (split.cash || 0) + (split.upi || 0) + (split.card || 0) + (split.bank || 0);
+    
+    if (chargeAmount === 0) return true; // No charge, so split is valid (not required)
+    return Math.abs(chargeAmount - splitTotal) < 0.01;
+  }
+
   getTotalCashCollected(): number {
     let total = 0;
     for (let i = 0; i < this.itemsFormArray.length; i++) {
       const item = this.itemsFormArray.at(i);
       total += item.get('cashCollected')?.value || 0;
     }
+    // ✅ Add delivery charge to total
+    total += this.form.get('deliveryCharge.chargeAmount')?.value || 0;
     return total;
   }
 
@@ -403,7 +483,7 @@ export class DailyDeliveryUpdateComponent implements OnInit {
       return;
     }
 
-    // Validate payment splits
+    // Validate payment splits for items
     for (let i = 0; i < this.itemsFormArray.length; i++) {
       if (!this.isPaymentSplitValid(i)) {
         const item = this.itemsFormArray.at(i);
@@ -411,6 +491,13 @@ export class DailyDeliveryUpdateComponent implements OnInit {
         this.toast.error(`Payment split for ${productName} does not match amount collected. Please set correct payment split.`);
         return;
       }
+    }
+
+    // ✅ NEW: Validate delivery charge payment split
+    const deliveryChargeAmount = this.form.get('deliveryCharge.chargeAmount')?.value || 0;
+    if (deliveryChargeAmount > 0 && !this.isDeliveryChargePaymentSplitValid()) {
+      this.toast.error('Delivery charge payment split does not match amount. Please set correct payment split.');
+      return;
     }
 
     // Validate credit mappings before closing
@@ -433,6 +520,25 @@ export class DailyDeliveryUpdateComponent implements OnInit {
           this.toast.error(`Failed to validate credit mapping for ${productName}`);
           return;
         }
+      }
+    }
+
+    // ✅ NEW: Save delivery charge first (if exists)
+    if (deliveryChargeAmount > 0) {
+      const chargePayload = {
+        chargeAmount: deliveryChargeAmount,
+        cashAmount: this.form.get('deliveryCharge.paymentSplit.cash')?.value || 0,
+        upiAmount: this.form.get('deliveryCharge.paymentSplit.upi')?.value || 0,
+        cardAmount: this.form.get('deliveryCharge.paymentSplit.card')?.value || 0,
+        bankAmount: this.form.get('deliveryCharge.paymentSplit.bank')?.value || 0,
+        remarks: this.form.get('deliveryCharge.remarks')?.value || ''
+      };
+
+      try {
+        await this.deliveryService.saveDeliveryCharge(this.deliveryId, chargePayload).toPromise();
+      } catch (err: any) {
+        this.toast.error('Failed to save delivery charge: ' + (err.error?.message || ''));
+        return;
       }
     }
 

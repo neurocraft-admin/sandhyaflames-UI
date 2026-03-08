@@ -1,7 +1,7 @@
 // src/app/services/daily-delivery.service.ts
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { DailyDelivery, DeliveryCloseRequest } from '../models/daily-delivery.model';
 import { DailyDeliveryItemActual, UpdateItemActualsRequest, DeliveryWithItems, CloseDeliveryWithItemsRequest } from '../models/daily-delivery-item-actual.model';
@@ -19,7 +19,33 @@ export class DailyDeliveryService {
 
   /* Get delivery by ID */
   getById(id: number): Observable<any> {
-    return this.http.get<any>(`${URL}/${id}`);
+    return this.http.get<any>(`${URL}/${id}`).pipe(
+      map(response => {
+        // Map PascalCase from API to camelCase for Angular
+        if (response && typeof response === 'object') {
+          const mapped: any = {};
+          for (const key in response) {
+            const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
+            mapped[camelKey] = response[key];
+          }
+          
+          // Map Items array if present
+          if (response.Items && Array.isArray(response.Items)) {
+            mapped.items = response.Items.map((item: any) => {
+              const mappedItem: any = {};
+              for (const key in item) {
+                const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
+                mappedItem[camelKey] = item[key];
+              }
+              return mappedItem;
+            });
+          }
+          
+          return mapped;
+        }
+        return response;
+      })
+    );
   }
 
   /* List all deliveries (with optional filters) */
@@ -102,6 +128,77 @@ validateCreditMappings(deliveryId: number, productId?: number): Observable<any> 
   return this.http.get<any>(
     `${URL}/${deliveryId}/validate-credit`,
     { params }
+  );
+}
+
+// ===============================================================
+// ✅ NEW METHODS FOR 5 ENHANCEMENTS
+// ===============================================================
+
+/* Update delivery (only if status is Open) */
+update(id: number, payload: DailyDelivery): Observable<{ success: boolean; message: string }> {
+  return this.http.put<{ success: boolean; message: string }>(`${URL}/${id}`, payload);
+}
+
+/* Delete delivery (only if status is Open) */
+delete(id: number): Observable<{ success: boolean; message: string }> {
+  return this.http.delete<{ success: boolean; message: string }>(`${URL}/${id}`);
+}
+
+/* Get all routes (for dropdown) */
+getRoutes(): Observable<any[]> {
+  return this.http.get<any[]>(`${environment.apiUrl}/delivery-routes`).pipe(
+    map((rows: any[]) => (rows || []).map(r => ({
+      routeId: r.RouteId,
+      routeName: r.RouteName,
+      description: r.Description,
+      isActive: r.IsActive,
+      createdAt: r.CreatedAt
+    })))
+  );
+}
+
+/* Get or create route (auto-insert) */
+getOrCreateRoute(routeName: string): Observable<{ routeId: number; routeName: string }> {
+  return this.http.post<{ routeId: number; routeName: string }>(
+    `${environment.apiUrl}/delivery-routes/get-or-create`,
+    { routeName }
+  );
+}
+
+/* Save delivery charge with payment split */
+saveDeliveryCharge(deliveryId: number, charge: any): Observable<any> {
+  return this.http.post<any>(`${URL}/${deliveryId}/charge`, charge);
+}
+
+/* Get delivery charge with payment split */
+getDeliveryCharge(deliveryId: number): Observable<any> {
+  return this.http.get<any>(`${URL}/${deliveryId}/charge`);
+}
+
+/* Get available drivers (not locked by open deliveries) */
+getAvailableDrivers(): Observable<any[]> {
+  return this.http.get<any[]>(`${environment.apiUrl}/drivers/available`).pipe(
+    map((rows: any[]) => (rows || []).map(d => ({
+      driverId: d.DriverId,
+      driverName: d.FullName,
+      phone: d.ContactNumber,
+      jobType: d.JobType,
+      isActive: d.IsActive
+    })))
+  );
+}
+
+/* Get available vehicles (not locked by open deliveries) */
+getAvailableVehicles(): Observable<any[]> {
+  return this.http.get<any[]>(`${environment.apiUrl}/vehicles/available`).pipe(
+    map((rows: any[]) => (rows || []).map(v => ({
+      vehicleId: v.VehicleId,
+      vehicleNumber: v.VehicleNumber,
+      make: v.Make,
+      model: v.Model,
+      isActive: v.IsActive
+    })))
   );
 }
 

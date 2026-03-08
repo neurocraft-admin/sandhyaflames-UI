@@ -1,11 +1,16 @@
 <!-- src/app/views/daily-delivery/daily-delivery.component.html -->
 <div class="container mt-3">
-  <div class="card shadow-sm">
+  <div class="card shadow-sm" [ngClass]="{'border-warning border-3': isEditing()}">
     <div class="card-body">
-      <h5 class="card-title mb-3">Daily Delivery Entry</h5>
+      <h5 class="card-title mb-3">
+        <span *ngIf="!isEditing()">Daily Delivery Entry</span>
+        <span *ngIf="isEditing()" class="text-warning">
+          <i class="cil-pencil"></i> Editing Delivery #{{ editingDeliveryId }}
+        </span>
+      </h5>
 
       <form [formGroup]="form" (ngSubmit)="submit()">
-        <!-- ===== Header Fields ===== -->
+        <!-- ===== Header Fields Row 1 ===== -->
         <div class="row mb-3">
           <!-- Date -->
           <div class="col-md-3">
@@ -16,12 +21,9 @@
           <!-- Driver -->
           <div class="col-md-3">
             <label for="driverSelect" class="form-label">Driver</label>
-
-            <!-- Assigned driver label (shows the assigned driver) -->
-            <div style="font-weight: bold; color: #0d6efd; margin-bottom: 3px;">
-              Assigned Driver: {{ assignedDriverName || 'None' }}
-            </div>
-
+            <small class="text-primary d-block mb-1">
+              Assigned: {{ assignedDriverName || 'None' }}
+            </small>
             <select id="driverSelect" class="form-select" formControlName="driverId" (change)="onDriverChange()">
               <option [ngValue]="0">-- Select Driver --</option>
               <option *ngFor="let d of drivers" [ngValue]="d.driverId">
@@ -31,14 +33,11 @@
           </div>
 
           <!-- Vehicle -->
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label for="vehicleSelect" class="form-label">Vehicle</label>
-
-            <!-- Assigned vehicle label (shows the default/assigned vehicle) -->
-            <div style="font-weight: bold; color: #0d6efd; margin-bottom: 3px;">
-              Assigned Vehicle: {{ assignedVehicleNumber || 'None' }}
-            </div>
-
+            <small class="text-primary d-block mb-1">
+              Assigned: {{ assignedVehicleNumber || 'None' }}
+            </small>
             <select id="vehicleSelect" class="form-select" formControlName="vehicleId">
               <option [ngValue]="0">-- Select Vehicle --</option>
               <option *ngFor="let v of vehicles" [ngValue]="v.vehicleId">
@@ -46,10 +45,38 @@
               </option>
             </select>
           </div>
+
+          <!-- Helper -->
+          <div class="col-md-3">
+            <label for="helperSelect" class="form-label">Helper (Optional)</label>
+            <small class="text-muted d-block mb-1">&nbsp;</small>
+            <select id="helperSelect" class="form-select" formControlName="helperId">
+              <option [ngValue]="null">-- No Helper --</option>
+              <option *ngFor="let d of drivers" [ngValue]="d.driverId">
+                {{ d.driverName }}
+              </option>
+            </select>
+          </div>
         </div>
 
-        <!-- ===== Time & Remarks ===== -->
+        <!-- ===== Time & Route Row 2 ===== -->
         <div class="row mb-3">
+          <!-- Route/Area -->
+          <div class="col-md-4">
+            <label for="routeInput" class="form-label">Route/Area (Optional)</label>
+            <input 
+              id="routeInput" 
+              type="text" 
+              class="form-control" 
+              formControlName="routeName"
+              placeholder="Enter or select route"
+              (blur)="onRouteChange($event)"
+              list="routeDatalist" />
+            <datalist id="routeDatalist">
+              <option *ngFor="let r of routes" [value]="r.routeName"></option>
+            </datalist>
+          </div>
+
           <!-- Start Time -->
           <div class="col-md-3">
             <label for="startTime" class="form-label">Start Time</label>
@@ -61,20 +88,25 @@
             <label for="returnTime" class="form-label">Return Time</label>
             <input id="returnTime" type="time" class="form-control" formControlName="returnTime" />
           </div>
+        </div>
 
+        <!-- ===== Remarks & Credit Row 3 ===== -->
+        <div class="row mb-3">
           <!-- Remarks -->
-          <div class="col-md-6">
+          <div class="col-md-9">
             <label for="remarks" class="form-label">Remarks</label>
             <input id="remarks" type="text" class="form-control" formControlName="remarks"
               placeholder="Optional remarks..." />
           </div>
 
           <!-- Has Credit Customers -->
-          <div class="col-md-3 d-flex align-items-center pt-4">
-            <input class="form-check-input me-2" type="checkbox" formControlName="hasCreditCustomers" id="creditCustomersChk" />
-            <label class="form-check-label" for="creditCustomersChk">
-              <strong>Has Credit Customers</strong>
-            </label>
+          <div class="col-md-3 d-flex align-items-end pb-2">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" formControlName="hasCreditCustomers" id="creditCustomersChk" />
+              <label class="form-check-label" for="creditCustomersChk">
+                <strong>Has Credit Customers</strong>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -126,8 +158,11 @@
 
         <!-- ===== Save Button ===== -->
         <div *ngIf="permissions.canCreate" class="mt-4 text-end">
+          <button *ngIf="isEditing()" type="button" class="btn btn-secondary me-2" (click)="cancelEdit()">
+            Cancel
+          </button>
           <button type="submit" class="btn btn-primary">
-            Save Delivery
+            {{ isEditing() ? 'Update Delivery' : 'Save Delivery' }}
           </button>
         </div>
       </form>
@@ -172,6 +207,8 @@
             <th>Date</th>
             <th>Vehicle</th>
             <th>Driver</th>
+            <th>Helper</th> <!-- ✅ NEW -->
+            <th>Route/Area</th> <!-- ✅ NEW -->
             <th>Status</th>
             <th>Actions</th>
           </tr>
@@ -181,12 +218,32 @@
             <td>{{ d.DeliveryDate | date: 'dd-MM-yyyy' }}</td>
             <td>{{ d.VehicleName || '-' }}</td>
             <td>{{ d.DriverName || '-' }}</td>
+            <td>{{ d.HelperName || '-' }}</td> <!-- ✅ NEW -->
+            <td>{{ d.RouteName || '-' }}</td> <!-- ✅ NEW -->
             <td>
               <span class="badge" [class.bg-success]="d.Status === 'Closed'" [class.bg-warning]="d.Status === 'Open'">
                 {{ d.Status }}
               </span>
             </td>
             <td>
+              <!-- ✅ NEW: Edit button (only for Open deliveries) -->
+              <button 
+                *ngIf="permissions.canUpdate && d.Status === 'Open'" 
+                class="btn btn-primary btn-sm me-1" 
+                (click)="loadDeliveryForEdit(d.DeliveryId)"
+                title="Edit delivery details (driver, vehicle, times)">
+                Edit
+              </button>
+              
+              <!-- Cancel button - Frees resources and restores stock -->
+              <button 
+                *ngIf="permissions.canDelete && d.Status === 'Open'" 
+                class="btn btn-danger btn-sm me-1" 
+                (click)="deleteDelivery(d.DeliveryId)"
+                title="Cancel this delivery - Frees driver/vehicle/helper and restores stock">
+                Cancel
+              </button>
+
               <button *ngIf="permissions.canUpdate" class="btn btn-info btn-sm me-1" (click)="recompute(d.DeliveryId)"
                 title="Recalculate planned items from delivery items (use after editing items or to populate initial metrics)">
                 Recompute
@@ -197,7 +254,7 @@
             </td>
           </tr>
           <tr *ngIf="!paginatedDeliveries || paginatedDeliveries.length === 0">
-            <td colspan="5" class="text-center text-muted">
+            <td colspan="7" class="text-center text-muted">
               No deliveries found for selected filters.
             </td>
           </tr>

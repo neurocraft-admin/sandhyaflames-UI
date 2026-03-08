@@ -7,6 +7,7 @@ export interface PaymentSplitModalData {
   productName: string;
   totalAmount: number;
   currentSplit?: PaymentSplitBreakdown;
+  disableCredit?: boolean; // ✅ NEW: Flag to disable credit for delivery charge
 }
 
 @Component({
@@ -40,13 +41,17 @@ export class PaymentSplitModalComponent implements OnInit, OnChanges {
 
   initForm(): void {
     const currentSplit = this.data?.currentSplit || { cash: 0, upi: 0, card: 0, bank: 0, credit: 0 };
+    const disableCredit = this.data?.disableCredit || false; // ✅ NEW
     
     this.splitForm = this.fb.group({
       cash: [currentSplit.cash, [Validators.required, Validators.min(0)]],
       upi: [currentSplit.upi, [Validators.required, Validators.min(0)]],
       card: [currentSplit.card, [Validators.required, Validators.min(0)]],
       bank: [currentSplit.bank, [Validators.required, Validators.min(0)]],
-      credit: [currentSplit.credit, [Validators.required, Validators.min(0)]]
+      credit: [
+        { value: disableCredit ? 0 : currentSplit.credit, disabled: disableCredit }, // ✅ NEW: Disable if flag is set
+        [Validators.required, Validators.min(0)]
+      ]
     });
 
     // Subscribe to form changes to validate in real-time

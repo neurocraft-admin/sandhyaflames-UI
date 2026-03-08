@@ -48,7 +48,9 @@ export class DailyDeliveryComponent {
   deliveries: any[] = [];
   filteredDeliveries: any[] = [];
   paginatedDeliveries: any[] = [];
-  isEditing = signal(true);
+  routes: any[] = []; // ✅ NEW: All routes for dropdown
+  isEditing = signal(false); // ✅ Changed default to false
+  editingDeliveryId: number | null = null; // ✅ NEW: Track which delivery is being edited
   
   // Filter & Pagination
   fromDate: string = this.yesterday();
@@ -61,7 +63,10 @@ export class DailyDeliveryComponent {
   form = this.fb.group({
     deliveryDate: [this.today(), Validators.required],
     driverId: [0, Validators.required],
+    helperId: [null as number | null], // ✅ NEW: Helper selection (optional)
     vehicleId: [0, Validators.required],
+    routeId: [null as number | null], // ✅ NEW: Route selection (optional)
+    routeName: [''], // ✅ NEW: For route autocomplete/display
     startTime: ['08:00:00', Validators.required],
     returnTime: [null],
     remarks: [''],
@@ -74,27 +79,47 @@ export class DailyDeliveryComponent {
   }
 
   ngOnInit() {
-  console.log('✅ DailyDeliveryComponent initialized');
+    console.log('✅ DailyDeliveryComponent initialized');
     this.productSvc.getAll().subscribe(p => this.products = p || []);
-  console.log('✅ ngOnInit fired');
-  this.driverSvc.getDeliveryDrivers().subscribe({
-    next: d => {
-      console.log('Driver API result:', d);
-      this.drivers = d;
-      this.loadDeliveries(); // Load deliveries after drivers are loaded
-    },
-    error: e => console.error('Driver load error', e)
-  });
+    console.log('✅ ngOnInit fired');
     
-    // Check for edit query param
+    // ✅ NEW: Load routes for dropdown
+    this.svc.getRoutes().subscribe({
+      next: routes => {
+        console.log('Routes loaded:', routes);
+        this.routes = routes || [];
+      },
+      error: e => console.error('Routes load error', e)
+    });
+      
+    // Check for edit query param first
     this.route.queryParams.subscribe(params => {
       const editId = params['edit'];
       if (editId) {
-        this.loadDeliveryForEdit(Number(editId));
+        // Edit mode: Load ALL drivers (not filtered by availability)
+        this.driverSvc.getDrivers().subscribe({
+          next: d => {
+            console.log('All drivers loaded for edit:', d);
+            this.drivers = d;
+            this.loadDeliveryForEdit(Number(editId));
+          },
+          error: e => console.error('Driver load error', e)
+        });
+      } else {
+        // Create mode: Load only available drivers
+        this.svc.getAvailableDrivers().subscribe({
+          next: d => {
+            console.log('Available drivers API result:', d);
+            this.drivers = d;
+            this.loadDeliveries();
+          },
+          error: e => console.error('Driver load error', e)
+        });
       }
     });
+    
     this.addItemRow();
-    this.loadPermissions(); // Load user permissions
+    this.loadPermissions();
   }
 
   loadPermissions() {
@@ -246,16 +271,30 @@ onProductChange(itemGroup: FormGroup, product?: any) {
       }
     });
 
-    // Get all active vehicles for dropdown
-    this.vehicleSvc.getVehicles().subscribe({
-      next: (vehicles) => {
-        this.vehicles = vehicles.filter(v => v.isActive);
-      },
-      error: () => {
-        this.vehicles = [];
-        this.toast.error('Failed to load vehicles');
-      }
-    });
+    // Get vehicles based on mode (available for create, all for edit)
+    if (this.isEditing()) {
+      // Edit mode: Load ALL vehicles so current selection is visible
+      this.vehicleSvc.getVehicles().subscribe({
+        next: (vehicles) => {
+          this.vehicles = vehicles.filter((v: any) => v.isActive);
+        },
+        error: () => {
+          this.vehicles = [];
+          this.toast.error('Failed to load vehicles');
+        }
+      });
+    } else {
+      // Create mode: Load only available vehicles (not locked by open deliveries)
+      this.svc.getAvailableVehicles().subscribe({
+        next: (vehicles) => {
+          this.vehicles = vehicles.filter((v: any) => v.isActive);
+        },
+        error: () => {
+          this.vehicles = [];
+          this.toast.error('Failed to load vehicles');
+        }
+      });
+    }
   }
 
   private normalizePayload(payload: any) {
@@ -263,19 +302,7 @@ onProductChange(itemGroup: FormGroup, product?: any) {
     return payload;
   }
 
-  /* Load delivery for editing */
-  loadDeliveryForEdit(deliveryId: number) {
-    // Note: You'll need to create a getDeliveryById method in your service
-    // For now, this is a placeholder that shows the structure
-    this.toast.info('Edit functionality requires backend API implementation');
-    // Clear query params after loading
-    this.router.navigate([], { 
-      queryParams: {}, 
-      queryParamsHandling: 'merge' 
-    });
-  }
-
-  /* Create new delivery */
+  /* Create new delivery or update existing */
   submit() {
     console.log('Form value:', this.form.value);
     console.log('Form valid:', this.form.valid);
@@ -289,15 +316,25 @@ onProductChange(itemGroup: FormGroup, product?: any) {
   }
 
     let payload = this.normalizePayload(this.form.getRawValue());
+
+    // ✅ If editing, call update API instead
+    if (this.isEditing() && this.editingDeliveryId) {
+      this.updateDelivery(this.editingDeliveryId, payload);
+      return;
+    }
+
+    // ✅ Otherwise, create new delivery
     this.svc.create(payload as any).subscribe({
       next: () => {
         this.toast.success('Delivery created');
-        this.form.reset({ deliveryDate: this.today(), startTime: '08:00:00', driverId: 0, vehicleId: 0, hasCreditCustomers: false });
-        this.vehicles = [];
-        this.assignedVehicleNumber = '';
-        this.assignedVehicleId = null;
-        this.items.clear();
-        this.addItemRow();
+        this.resetForm();
+        
+        // Reload available drivers after creating delivery
+        this.svc.getAvailableDrivers().subscribe({
+          next: d => this.drivers = d,
+          error: e => console.error('Driver reload error', e)
+        });
+        
         this.loadDeliveries();
       },
     error: (err) => {
@@ -337,6 +374,212 @@ onProductChange(itemGroup: FormGroup, product?: any) {
     console.log('Form value:', this.form.value);
     console.log('Form valid:', this.form.valid);
 
+  }
+
+  /* ✅ NEW: Update existing delivery */
+  updateDelivery(deliveryId: number, payload: any) {
+    this.svc.update(deliveryId, payload as any).subscribe({
+      next: () => {
+        this.toast.success('Delivery updated');
+        this.resetForm();
+        this.isEditing.set(false);
+        this.editingDeliveryId = null;
+        
+        // Reload available drivers for create mode
+        this.svc.getAvailableDrivers().subscribe({
+          next: d => this.drivers = d,
+          error: e => console.error('Driver reload error', e)
+        });
+        
+        this.loadDeliveries();
+      },
+      error: (err) => {
+        let message = 'Failed to update delivery';
+        if (err?.error?.message) {
+          message = err.error.message;
+        }
+        this.toast.error(message);
+      }
+    });
+  }
+
+  /* ✅ NEW: Delete delivery (soft delete, Open only) */
+  deleteDelivery(deliveryId: number) {
+    if (!confirm('⚠️ Cancel this delivery?\n\nThis will:\n• Free up driver, helper, and vehicle\n• Restore all assigned stock\n• Cannot be undone\n\nProceed?')) {
+      return;
+    }
+
+    this.svc.delete(deliveryId).subscribe({
+      next: () => {
+        this.toast.success('Delivery canceled. Resources and stock have been freed.');
+        this.loadDeliveries();
+      },
+      error: (err) => {
+        let message = 'Failed to cancel delivery';
+        if (err?.error?.message) {
+          message = err.error.message;
+        }
+        this.toast.error(message);
+      }
+    });
+  }
+
+  /* ✅ NEW: Cancel editing */
+  cancelEdit() {
+    this.resetForm();
+    this.isEditing.set(false);
+    this.editingDeliveryId = null;
+    
+    // Reload available drivers for create mode
+    this.svc.getAvailableDrivers().subscribe({
+      next: d => {
+        this.drivers = d;
+        console.log('Reloaded available drivers after cancel:', d.length);
+      },
+      error: e => console.error('Driver reload error', e)
+    });
+    
+    this.router.navigate([], { queryParams: {}, queryParamsHandling: 'merge' });
+  }
+
+  /* ✅ NEW: Reset form to initial state */
+  resetForm() {
+    this.form.reset({ 
+      deliveryDate: this.today(), 
+      startTime: '08:00:00', 
+      driverId: 0, 
+      helperId: null,
+      vehicleId: 0, 
+      routeId: null,
+      routeName: '',
+      hasCreditCustomers: false 
+    });
+    this.vehicles = [];
+    this.assignedVehicleNumber = '';
+    this.assignedVehicleId = null;
+    this.items.clear();
+    this.addItemRow();
+  }
+
+  /* ✅ NEW: Load delivery for editing */
+  loadDeliveryForEdit(deliveryId: number) {
+    this.svc.getById(deliveryId).subscribe({
+      next: (delivery) => {
+        console.log('Loading delivery for edit:', delivery);
+        
+        // Set edit mode
+        this.isEditing.set(true);
+        this.editingDeliveryId = deliveryId;
+        
+        // Load ALL drivers (not just available) so current driver is visible
+        this.driverSvc.getDrivers().subscribe({
+          next: (allDrivers) => {
+            this.drivers = allDrivers;
+            
+            // Set assigned driver info
+            const assignedDriver = allDrivers.find((d: any) => d.driverId === delivery.DriverId);
+            if (assignedDriver) {
+              this.assignedDriverName = assignedDriver.driverName;
+              this.assignedDriverId = assignedDriver.driverId;
+            }
+          }
+        });
+        
+        // Load ALL vehicles (not just available) so current vehicle is visible
+        this.vehicleSvc.getVehicles().subscribe({
+          next: (allVehicles) => {
+            this.vehicles = allVehicles;
+            
+            // Set assigned vehicle info
+            const assignedVehicle = allVehicles.find((v: any) => v.vehicleId === delivery.VehicleId);
+            if (assignedVehicle) {
+              this.assignedVehicleNumber = assignedVehicle.vehicleNumber;
+              this.assignedVehicleId = assignedVehicle.vehicleId;
+            }
+          }
+        });
+        
+        // Populate form
+        this.form.patchValue({
+          deliveryDate: delivery.DeliveryDate?.substring(0, 10) || this.today(),
+          driverId: delivery.DriverId || 0,
+          helperId: delivery.HelperId || null,
+          vehicleId: delivery.VehicleId || 0,
+          routeId: delivery.RouteId || null,
+          routeName: delivery.RouteName || '',
+          startTime: delivery.StartTime || '08:00:00',
+          returnTime: delivery.ReturnTime || null,
+          remarks: delivery.Remarks || '',
+          hasCreditCustomers: delivery.HasCreditCustomers || false
+        });
+        
+        // Load delivery items
+        this.items.clear();
+        if (delivery.Items && delivery.Items.length > 0) {
+          delivery.Items.forEach((item: any) => {
+            const itemGroup = this.fb.group({
+              productId: [item.ProductId || 0, Validators.required],
+              noOfCylinders: [item.NoOfCylinders || 0],
+              noOfInvoices: [item.NoOfInvoices || 1, [Validators.required, Validators.min(1)]],
+              noOfItems: [item.NoOfItems || 0]
+            });
+            this.items.push(itemGroup);
+          });
+        } else {
+          this.addItemRow();
+        }
+        
+        this.toast.info('Editing delivery #' + deliveryId);
+        
+        // ✅ Scroll to top to show the populated form
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
+      },
+      error: (err) => {
+        console.error('Failed to load delivery:', err);
+        this.toast.error('Failed to load delivery for editing');
+        this.router.navigate([], { queryParams: {}, queryParamsHandling: 'merge' });
+      }
+    });
+  }
+
+  /* ✅ NEW: Handle route selection or auto-create */
+  onRouteChange(event: Event) {
+    const input = event.target as HTMLInputElement | HTMLSelectElement;
+    const routeName = input.value;
+
+    if (!routeName || routeName.trim() === '') {
+      this.form.patchValue({ routeId: null, routeName: '' });
+      return;
+    }
+
+    // Check if route exists in the list
+    const existingRoute = this.routes.find(r => 
+      r.RouteName?.toLowerCase() === routeName.toLowerCase() ||
+      r.routeName?.toLowerCase() === routeName.toLowerCase()
+    );
+
+    if (existingRoute) {
+      this.form.patchValue({ 
+        routeId: existingRoute.RouteId || existingRoute.routeId, 
+        routeName: existingRoute.RouteName || existingRoute.routeName 
+      });
+    } else {
+      // Auto-create new route
+      this.svc.getOrCreateRoute(routeName).subscribe({
+        next: (response) => {
+          this.form.patchValue({ routeId: response.routeId, routeName: response.routeName });
+          // Refresh routes list
+          this.svc.getRoutes().subscribe(routes => this.routes = routes || []);
+          this.toast.success(`Route "${response.routeName}" created`);
+        },
+        error: () => {
+          this.toast.error('Failed to create route');
+          this.form.patchValue({ routeId: null, routeName: '' });
+        }
+      });
+    }
   }
 
   /* Load deliveries for table */
