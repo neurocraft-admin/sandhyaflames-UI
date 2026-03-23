@@ -1,10 +1,11 @@
 import { Component, OnInit, inject, signal, WritableSignal, effect, DestroyRef, Renderer2, DOCUMENT } from '@angular/core';
 import { DashboardService } from '../../services/dashboard.service';
 import { DashboardSummary } from '../../models/dashboard-summary.model';
+import { OpenDeliveryMonitoring } from '../../models/open-delivery-monitoring.model';
 import { ChartOptions } from 'chart.js';
 import { DashboardChartsData, IChartProps } from './dashboard_old-charts-data';
 import { FormGroup, FormControl } from '@angular/forms';
-import { CommonModule, CurrencyPipe } from '@angular/common';
+import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 
 // CoreUI Components
@@ -12,13 +13,22 @@ import {
   CardComponent,
   CardBodyComponent,
   CardFooterComponent,
+  CardHeaderComponent,
   RowComponent,
   ColComponent,
   ProgressComponent,
   ButtonDirective,
   ButtonGroupComponent,
   FormCheckLabelDirective,
-  GutterDirective
+  GutterDirective,
+  ModalComponent,
+  ModalHeaderComponent,
+  ModalTitleDirective,
+  ModalBodyComponent,
+  ModalFooterComponent,
+  ButtonCloseDirective,
+  ModalToggleDirective,
+  TableDirective
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
 import { ChartjsComponent } from '@coreui/angular-chartjs';
@@ -34,9 +44,11 @@ import { WidgetsBrandComponent } from '../widgets/widgets-brand/widgets-brand.co
     CommonModule,
     ReactiveFormsModule,
     CurrencyPipe,
+    DatePipe,
     CardComponent,
     CardBodyComponent,
     CardFooterComponent,
+    CardHeaderComponent,
     RowComponent,
     ColComponent,
     ProgressComponent,
@@ -46,6 +58,14 @@ import { WidgetsBrandComponent } from '../widgets/widgets-brand/widgets-brand.co
     GutterDirective,
     IconDirective,
     ChartjsComponent,
+    ModalComponent,
+    ModalHeaderComponent,
+    ModalTitleDirective,
+    ModalBodyComponent,
+    ModalFooterComponent,
+    ModalToggleDirective,
+    ButtonCloseDirective,
+    TableDirective,
     WidgetsDropdownComponent,
     WidgetsBrandComponent
   ]
@@ -58,6 +78,12 @@ export class DashboardComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
 
   summary: DashboardSummary | null = null;
+  
+  // Open Delivery Monitoring
+  openDeliveries: OpenDeliveryMonitoring[] = [];
+  displayedDeliveries: OpenDeliveryMonitoring[] = [];
+  showViewMoreButton = false;
+  isModalVisible = false;
 
   public mainChart: IChartProps = { type: 'line' };
   public mainChartRef: WritableSignal<any> = signal(undefined);
@@ -67,6 +93,7 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSummary();
+    this.loadOpenDeliveries();
     this.initCharts();
     this.setupColorSchemeWatcher();
   }
@@ -76,6 +103,27 @@ export class DashboardComponent implements OnInit {
       next: (res) => this.summary = res,
       error: (err) => console.error('Dashboard summary fetch failed', err)
     });
+  }
+
+  loadOpenDeliveries() {
+    this.dashboardSvc.getTodayOpenDeliveries().subscribe({
+      next: (res) => {
+        this.openDeliveries = res;
+        // Display top 10 entries
+        this.displayedDeliveries = res.slice(0, 10);
+        // Show "View More" button if more than 10 entries
+        this.showViewMoreButton = res.length > 10;
+      },
+      error: (err) => console.error('Open deliveries fetch failed', err)
+    });
+  }
+
+  openModal() {
+    this.isModalVisible = true;
+  }
+
+  closeModal() {
+    this.isModalVisible = false;
   }
 
   initCharts(): void {

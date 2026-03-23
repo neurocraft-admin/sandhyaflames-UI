@@ -1,0 +1,192 @@
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header>
+        <strong>Performance Report - Drivers & Helpers</strong>
+      </c-card-header>
+      <c-card-body>
+        <!-- Filters -->
+        <c-row class="mb-3">
+          <c-col md="3">
+            <label cLabel for="startDate">Start Date</label>
+            <input 
+              cFormControl 
+              type="date" 
+              id="startDate"
+              [(ngModel)]="startDate" 
+              (change)="onDateChange()"
+            />
+          </c-col>
+          <c-col md="3">
+            <label cLabel for="endDate">End Date</label>
+            <input 
+              cFormControl 
+              type="date" 
+              id="endDate"
+              [(ngModel)]="endDate" 
+              (change)="onDateChange()"
+            />
+          </c-col>
+          <c-col md="2">
+            <label cLabel for="personType">Person Type</label>
+            <select 
+              cSelect 
+              id="personType"
+              [(ngModel)]="personType"
+              (change)="onFilterChange()"
+            >
+              <option value="">All</option>
+              <option value="Driver">Driver</option>
+              <option value="Helper">Helper</option>
+            </select>
+          </c-col>
+          <c-col md="4" class="text-end">
+            <label cLabel>&nbsp;</label>
+            <div>
+              <button 
+                cButton 
+                color="success"
+                (click)="exportToExcel()"
+                [disabled]="reportData().length === 0"
+              >
+                <svg cIcon name="cilCloudDownload" class="me-2"></svg>
+                Export to Excel
+              </button>
+            </div>
+          </c-col>
+        </c-row>
+
+        <!-- Summary Cards -->
+        <c-row class="mb-3">
+          <c-col sm="6" lg="3">
+            <div class="border-start border-start-4 border-start-info py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Total Deliveries</div>
+              <div class="fs-5 fw-semibold">{{ getTotalDeliveries() }}</div>
+            </div>
+          </c-col>
+          <c-col sm="6" lg="3">
+            <div class="border-start border-start-4 border-start-primary py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Total Items</div>
+              <div class="fs-5 fw-semibold">{{ getTotalItems().toLocaleString() }}</div>
+            </div>
+          </c-col>
+          <c-col sm="6" lg="3">
+            <div class="border-start border-start-4 border-start-success py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Total Cash</div>
+              <div class="fs-5 fw-semibold">₹{{ getTotalCash().toLocaleString() }}</div>
+            </div>
+          </c-col>
+          <c-col sm="6" lg="3">
+            <div class="border-start border-start-4 border-start-warning py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Avg Completion</div>
+              <div class="fs-5 fw-semibold">{{ getAvgCompletionRate().toFixed(1) }}%</div>
+            </div>
+          </c-col>
+        </c-row>
+
+        <!-- Loading Spinner -->
+        <div *ngIf="isLoading()" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div *ngIf="!isLoading() && reportData().length > 0">
+          <c-row class="mb-4">
+            <c-col lg="6">
+              <c-card>
+                <c-card-body>
+                  <div style="height: 300px;">
+                    <canvas #deliveryChart></canvas>
+                  </div>
+                </c-card-body>
+              </c-card>
+            </c-col>
+            <c-col lg="6">
+              <c-card>
+                <c-card-body>
+                  <div style="height: 300px;">
+                    <canvas #itemsChart></canvas>
+                  </div>
+                </c-card-body>
+              </c-card>
+            </c-col>
+          </c-row>
+        </div>
+
+        <!-- Data Table -->
+        <div *ngIf="!isLoading()" class="table-responsive">
+          <table cTable [hover]="true" [striped]="true" class="border">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Total Deliveries</th>
+                <th>Contributed Items</th>
+                <th>Contributed Cash</th>
+                <th>Avg Items/Delivery</th>
+                <th>Completion Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (reportData().length === 0) {
+                <tr>
+                  <td colspan="7" class="text-center text-muted py-4">
+                    No data available for selected date range
+                  </td>
+                </tr>
+              }
+              @for (item of reportData(); track item.personId) {
+                <tr>
+                  <td class="fw-semibold">{{ item.personName }}</td>
+                  <td>
+                    <span 
+                      class="badge"
+                      [ngClass]="{
+                        'bg-primary': item.personType === 'Driver',
+                        'bg-info': item.personType === 'Helper'
+                      }"
+                    >
+                      {{ item.personType }}
+                    </span>
+                  </td>
+                  <td>{{ item.totalDeliveries }}</td>
+                  <td>{{ item.contributedItems.toLocaleString() }}</td>
+                  <td>₹{{ item.contributedCash.toLocaleString() }}</td>
+                  <td>{{ item.avgItemsPerDelivery.toFixed(2) }}</td>
+                  <td>
+                    <span 
+                      class="badge"
+                      [ngClass]="{
+                        'bg-success': item.completionRate >= 90,
+                        'bg-warning': item.completionRate >= 70 && item.completionRate < 90,
+                        'bg-danger': item.completionRate < 70
+                      }"
+                    >
+                      {{item.completionRate.toFixed(1) }}%
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Performance Notes -->
+        <div *ngIf="!isLoading() && reportData().length > 0" class="mt-3">
+          <c-card class="border-start border-start-4 border-start-info">
+            <c-card-body>
+              <h6 class="text-info">📊 Performance Metrics Notes</h6>
+              <ul class="mb-0 small">
+                <li><strong>Contribution Split:</strong> When a delivery has 1 Driver + 1 Helper, items and cash are split 50-50</li>
+                <li><strong>Completion Rate:</strong> Percentage of deliveries successfully closed</li>
+                <li><strong>Charts:</strong> Showing top 10 performers by total deliveries</li>
+              </ul>
+            </c-card-body>
+          </c-card>
+        </div>
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

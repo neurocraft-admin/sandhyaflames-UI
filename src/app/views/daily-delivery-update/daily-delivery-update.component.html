@@ -55,6 +55,8 @@
                 <th>Damaged</th>
                 <th>Unit Price</th>
                 <th>Cash Collected</th>
+                <th>Payment Split</th>
+                <th>Credit Mapping</th>
                 <th>Status</th>
                 <th>Remarks</th>
               </tr>
@@ -129,6 +131,45 @@
                   </small>
                 </td>
                 
+                <!-- Payment Split Button -->
+                <td class="text-center">
+                  <button 
+                    type="button" 
+                    class="btn btn-sm"
+                    [class.btn-primary]="!hasPaymentSplit(i)"
+                    [class.btn-success]="hasPaymentSplit(i) && isPaymentSplitValid(i)"
+                    [class.btn-danger]="hasPaymentSplit(i) && !isPaymentSplitValid(i)"
+                    (click)="openPaymentSplitModal(i)"
+                    title="Click to set payment split"
+                  >
+                    <i class="bi bi-wallet2 me-1"></i>
+                    <span *ngIf="!hasPaymentSplit(i)">Set Split</span>
+                    <span *ngIf="hasPaymentSplit(i) && isPaymentSplitValid(i)">
+                      <i class="bi bi-check-circle"></i>
+                    </span>
+                    <span *ngIf="hasPaymentSplit(i) && !isPaymentSplitValid(i)">
+                      <i class="bi bi-exclamation-triangle"></i>
+                    </span>
+                  </button>
+                </td>
+                
+                <!-- Credit Mapping Button -->
+                <td class="text-center">
+                  <button 
+                    *ngIf="hasCreditAmount(i)"
+                    type="button" 
+                    class="btn btn-sm btn-warning"
+                    (click)="openCreditMappingModal(i)"
+                    title="Click to map credit to customers"
+                  >
+                    <i class="bi bi-people-fill me-1"></i>
+                    Map Credit
+                  </button>
+                  <span *ngIf="!hasCreditAmount(i)" class="text-muted small">
+                    No Credit
+                  </span>
+                </td>
+                
                 <!-- Status Badge -->
                 <td class="text-center">
                   <span [class]="getItemStatusClass(i)">
@@ -147,7 +188,7 @@
               
               <!-- Empty State -->
               <tr *ngIf="itemsFormArray.length === 0">
-                <td colspan="11" class="text-center text-muted">
+                <td colspan="13" class="text-center text-muted">
                   No items found for this delivery
                 </td>
               </tr>
@@ -163,10 +204,76 @@
                 <th class="text-center">{{ getTotalDamagedReturned() }}</th>
                 <th></th>
                 <th class="text-end">{{ getTotalCashCollected() | currency:'INR' }}</th>
-                <th colspan="2"></th>
+                <th colspan="4"></th>
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        <!-- ✅ NEW: Delivery Charge Section -->
+        <div formGroupName="deliveryCharge" class="mb-4">
+          <h6 class="mb-3">Delivery Charge (Optional)</h6>
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm">
+              <thead class="table-warning">
+                <tr>
+                  <th style="width: 25%;">Charge Type</th>
+                  <th style="width: 20%;">Amount</th>
+                  <th style="width: 20%;">Payment Split</th>
+                  <th style="width: 35%;">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>Delivery Charge</strong>
+                    <br>
+                    <small class="text-muted">Fuel, toll, parking, etc.</small>
+                  </td>
+                  <td>
+                    <input 
+                      type="number" 
+                      class="form-control form-control-sm" 
+                      formControlName="chargeAmount"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00">
+                  </td>
+                  <td class="text-center">
+                    <button 
+                      type="button" 
+                      class="btn btn-sm"
+                      [class.btn-primary]="!hasDeliveryChargePaymentSplit()"
+                      [class.btn-success]="hasDeliveryChargePaymentSplit() && isDeliveryChargePaymentSplitValid()"
+                      [class.btn-danger]="hasDeliveryChargePaymentSplit() && !isDeliveryChargePaymentSplitValid()"
+                      (click)="openDeliveryChargePaymentSplit()"
+                      title="Click to set payment split"
+                    >
+                      <i class="bi bi-wallet2 me-1"></i>
+                      <span *ngIf="!hasDeliveryChargePaymentSplit()">Set Split</span>
+                      <span *ngIf="hasDeliveryChargePaymentSplit() && isDeliveryChargePaymentSplitValid()">
+                        <i class="bi bi-check-circle"></i>
+                      </span>
+                      <span *ngIf="hasDeliveryChargePaymentSplit() && !isDeliveryChargePaymentSplitValid()">
+                        <i class="bi bi-exclamation-triangle"></i>
+                      </span>
+                    </button>
+                  </td>
+                  <td>
+                    <input 
+                      type="text" 
+                      class="form-control form-control-sm" 
+                      formControlName="remarks"
+                      placeholder="Optional notes">
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <small class="text-info">
+            <i class="bi bi-info-circle me-1"></i>
+            Note: Delivery charge does not support credit payment mode and is not mapped to customers.
+          </small>
         </div>
 
         <!-- Delivery Closure Section -->
@@ -203,3 +310,19 @@
     </div>
   </div>
 </div>
+
+<!-- Payment Split Modal -->
+<app-payment-split-modal
+  [show]="showPaymentSplitModal()"
+  [data]="paymentSplitModalData"
+  (close)="closePaymentSplitModal()"
+  (save)="savePaymentSplit($event)"
+></app-payment-split-modal>
+
+<!-- Credit Mapping Modal -->
+<app-credit-mapping-modal
+  [show]="showCreditMappingModal()"
+  [data]="creditMappingModalData"
+  (close)="closeCreditMappingModal()"
+  (saved)="onCreditMappingSaved()"
+></app-credit-mapping-modal>

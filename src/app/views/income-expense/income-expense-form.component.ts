@@ -33,6 +33,7 @@ export class IncomeExpenseFormComponent implements OnInit {
     });
 
     this.watchTypeChanges();
+    this.fetchList(); // Load recent entries on page load
   }
   incomeExpenseList: any[] = [];
 filterType = '';
@@ -94,6 +95,7 @@ selectCategory(name: string) {
         this.toast.success('Saved successfully!');
         this.form.reset({ entryDate: this.today(), type: 'Expense', paymentMode: 'Cash' });
         this.suggestions = [];
+        this.fetchList(); // Refresh recent entries after successful save
       },
       error: (err) => {
         const msg = err?.error?.message || err?.error?.title || err?.message || 'Save failed';

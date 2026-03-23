@@ -1,5 +1,5 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://localhost:7183/api',
+  apiUrl: 'http://localhost:5027/api',
   emailDomain: 'sandhyaflames.in'
 };

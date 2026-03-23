@@ -1,0 +1,623 @@
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header>
+        <strong>📊 Daily Reports</strong>
+        <div class="float-end">
+          <input
+            type="date"
+            class="form-control form-control-sm"
+            [value]="reportDate()"
+            (change)="reportDate.set($any($event.target).value); onDateChange()"
+          />
+        </div>
+      </c-card-header>
+      <c-card-body>
+        <!-- Tabs -->
+        <ul cNav variant="tabs" role="tablist">
+          <li cNavItem>
+            <a cNavLink [active]="activeTab() === 0" (click)="onTabChange(0)">
+              🚚 Deliveries
+            </a>
+          </li>
+          <li cNavItem>
+            <a cNavLink [active]="activeTab() === 1" (click)="onTabChange(1)">
+              💰 Cash Collection
+            </a>
+          </li>
+          <li cNavItem>
+            <a cNavLink [active]="activeTab() === 2" (click)="onTabChange(2)">
+              👨‍✈️ Drivers
+            </a>
+          </li>
+          <li cNavItem>
+            <a cNavLink [active]="activeTab() === 3" (click)="onTabChange(3)">
+              🤝 Helpers
+            </a>
+          </li>
+          <li cNavItem>
+            <a cNavLink [active]="activeTab() === 4" (click)="onTabChange(4)">
+              💸 Expenses
+            </a>
+          </li>
+          <li cNavItem>
+            <a cNavLink [active]="activeTab() === 5" (click)="onTabChange(5)">
+              🛢️ Cylinder Stock
+            </a>
+          </li>
+          <li cNavItem>
+            <a cNavLink [active]="activeTab() === 6" (click)="onTabChange(6)">
+              📦 Other Items
+            </a>
+          </li>
+        </ul>
+
+        <!-- Tab Content (using @if instead of c-tab-pane) -->
+        <div class="tab-content">
+          <!-- =============================================
+               TAB 1: Daily Delivery Report
+               ============================================= -->
+          @if (activeTab() === 0) {
+            <div class="mt-3" role="tabpanel">
+              <h5>Daily Delivery Summary - {{ reportDate() }}</h5>
+              
+              <div class="row mb-3">
+                <div class="col-md-3">
+                  <div class="card bg-info text-white">
+                    <div class="card-body">
+                      <h6>Total Deliveries</h6>
+                      <h3>{{ getTotalDeliveries() }}</h3>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-primary text-white">
+                    <div class="card-body">
+                      <h6>Total Items</h6>
+                      <h3>{{ getTotalDeliveryQuantity() }}</h3>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-success text-white">
+                    <div class="card-body">
+                      <h6>Cash Collected</h6>
+                      <h3>₹{{ getTotalDeliveryCash() | number:'1.2-2' }}</h3>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table cTable striped hover>
+                  <thead>
+                    <tr>
+                      <th>Delivery ID</th>
+                      <th>Status</th>
+                      <th>Driver</th>
+                      <th>Helper</th>
+                      <th>Vehicle</th>
+                      <th>Route</th>
+                      <th>Start Time</th>
+                      <th>Return Time</th>
+                      <th>Items</th>
+                      <th>Products</th>
+                      <th>Cash</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @if (isLoading()) {
+                      <tr>
+                        <td colspan="11" class="text-center">Loading...</td>
+                      </tr>
+                    } @else if (deliveryReport().length === 0) {
+                      <tr>
+                        <td colspan="11" class="text-center">No deliveries found for this date</td>
+                      </tr>
+                    } @else {
+                      @for (item of deliveryReport(); track item.deliveryId) {
+                        <tr>
+                          <td>#{{ item.deliveryId }}</td>
+                          <td>
+                            <span [class]="'badge bg-' + (item.status === 'Open' ? 'warning' : 'success')">
+                              {{ item.status }}
+                            </span>
+                          </td>
+                          <td>{{ item.driverName }}</td>
+                          <td>{{ item.helperName || '-' }}</td>
+                          <td>{{ item.vehicleNumber }}</td>
+                          <td>{{ item.routeName }}</td>
+                          <td>{{ item.startTime || '-' }}</td>
+                          <td>{{ item.returnTime || '-' }}</td>
+                          <td>{{ item.totalQuantity }}</td>
+                          <td><small>{{ item.productsDetail }}</small></td>
+                          <td>₹{{ item.cashCollected | number:'1.2-2' }}</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          <!-- =============================================
+               TAB 2: Daily Cash Collection Report
+               ============================================= -->
+          @if (activeTab() === 1) {
+            <div class="mt-3" role="tabpanel">
+              <h5>Daily Cash Collection - {{ reportDate() }}</h5>
+              
+              <div class="row mb-3">
+                <div class="col-md-2">
+                  <div class="card bg-success text-white">
+                    <div class="card-body">
+                      <h6>Total Collection</h6>
+                      <h4>₹{{ getTotalCashCollection() | number:'1.2-2' }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div class="card bg-info text-white">
+                    <div class="card-body">
+                      <h6>Cash</h6>
+                      <h4>₹{{ getCashCollectionByMode('Cash') | number:'1.2-2' }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div class="card bg-primary text-white">
+                    <div class="card-body">
+                      <h6>UPI</h6>
+                      <h4>₹{{ getCashCollectionByMode('UPI') | number:'1.2-2' }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div class="card bg-warning text-white">
+                    <div class="card-body">
+                      <h6>Bank Transfer</h6>
+                      <h4>₹{{ getCashCollectionByMode('Bank Transfer') | number:'1.2-2' }}</h4>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table cTable striped hover>
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Source</th>
+                      <th>Reference</th>
+                      <th>Category</th>
+                      <th>Amount</th>
+                      <th>Payment Mode</th>
+                      <th>Collected By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @if (isLoading()) {
+                      <tr>
+                        <td colspan="7" class="text-center">Loading...</td>
+                      </tr>
+                    } @else if (cashCollectionReport().length === 0) {
+                      <tr>
+                        <td colspan="7" class="text-center">No collections found for this date</td>
+                      </tr>
+                    } @else {
+                      @for (item of cashCollectionReport(); track $index) {
+                        <tr>
+                          <td>{{ item.collectionTime | date:'HH:mm:ss' }}</td>
+                          <td>
+                            <span [class]="'badge bg-' + (item.source === 'Delivery' ? 'primary' : 'info')">
+                              {{ item.source }}
+                            </span>
+                          </td>
+                          <td>{{ item.reference }}</td>
+                          <td>{{ item.category }}</td>
+                          <td><strong>₹{{ item.amount | number:'1.2-2' }}</strong></td>
+                          <td>{{ item.paymentMode }}</td>
+                          <td>{{ item.collectedBy }}</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          <!-- =============================================
+               TAB 3: Daily Driver Delivery Report
+               ============================================= -->
+          @if (activeTab() === 2) {
+            <div class="mt-3" role="tabpanel">
+              <h5>Driver Delivery Summary - {{ reportDate() }}</h5>
+              
+              <div class="row mb-3">
+                <div class="col-md-3">
+                  <div class="card bg-info text-white">
+                    <div class="card-body">
+                      <h6>Total Deliveries</h6>
+                      <h3>{{ getTotalDriverDeliveries() }}</h3>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-primary text-white">
+                    <div class="card-body">
+                      <h6>Total Items</h6>
+                      <h3>{{ getTotalDriverItems() }}</h3>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-success text-white">
+                    <div class="card-body">
+                      <h6>Total Cash</h6>
+                      <h3>₹{{ getTotalDriverCash() | number:'1.2-2' }}</h3>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table cTable striped hover>
+                  <thead>
+                    <tr>
+                      <th>Driver Name</th>
+                      <th>Deliveries</th>
+                      <th>Cylinders</th>
+                      <th>Other Items</th>
+                      <th>Total Items</th>
+                      <th>Cash Collected</th>
+                      <th>Products Breakdown</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @if (isLoading()) {
+                      <tr>
+                        <td colspan="7" class="text-center">Loading...</td>
+                      </tr>
+                    } @else if (driverDeliveryReport().length === 0) {
+                      <tr>
+                        <td colspan="7" class="text-center">No driver deliveries found for this date</td>
+                      </tr>
+                    } @else {
+                      @for (item of driverDeliveryReport(); track item.driverId) {
+                        <tr>
+                          <td><strong>{{ item.driverName }}</strong></td>
+                          <td>{{ item.totalDeliveries }}</td>
+                          <td>{{ item.totalCylinders }}</td>
+                          <td>{{ item.totalOtherItems }}</td>
+                          <td>{{ item.totalItems }}</td>
+                          <td>₹{{ item.totalCashCollected | number:'1.2-2' }}</td>
+                          <td><small>{{ item.productsBreakdown }}</small></td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          <!-- =============================================
+               TAB 4: Daily Helper Delivery Report
+               ============================================= -->
+          @if (activeTab() === 3) {
+            <div class="mt-3" role="tabpanel">
+              <h5>Helper Delivery Summary - {{ reportDate() }}</h5>
+              
+              <div class="row mb-3">
+                <div class="col-md-3">
+                  <div class="card bg-info text-white">
+                    <div class="card-body">
+                      <h6>Total Assistances</h6>
+                      <h3>{{ getTotalHelperDeliveries() }}</h3>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-primary text-white">
+                    <div class="card-body">
+                      <h6>Total Items</h6>
+                      <h3>{{ getTotalHelperItems() }}</h3>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table cTable striped hover>
+                  <thead>
+                    <tr>
+                      <th>Helper Name</th>
+                      <th>Deliveries Assisted</th>
+                      <th>Cylinders</th>
+                      <th>Other Items</th>
+                      <th>Total Items</th>
+                      <th>Products Breakdown</th>
+                      <th>Deliveries Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @if (isLoading()) {
+                      <tr>
+                        <td colspan="7" class="text-center">Loading...</td>
+                      </tr>
+                    } @else if (helperDeliveryReport().length === 0) {
+                      <tr>
+                        <td colspan="7" class="text-center">No helper deliveries found for this date</td>
+                      </tr>
+                    } @else {
+                      @for (item of helperDeliveryReport(); track item.helperId) {
+                        <tr>
+                          <td><strong>{{ item.helperName }}</strong></td>
+                          <td>{{ item.totalDeliveriesAssisted }}</td>
+                          <td>{{ item.totalCylinders }}</td>
+                          <td>{{ item.totalOtherItems }}</td>
+                          <td>{{ item.totalItems }}</td>
+                          <td><small>{{ item.productsBreakdown }}</small></td>
+                          <td><small>{{ item.deliveriesDetail }}</small></td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          <!-- =============================================
+               TAB 5: Daily Expense Report
+               ============================================= -->
+          @if (activeTab() === 4) {
+            <div class="mt-3" role="tabpanel">
+              <h5>Daily Expense Summary - {{ reportDate() }}</h5>
+              
+              <div class="row mb-3">
+                <div class="col-md-2">
+                  <div class="card bg-danger text-white">
+                    <div class="card-body">
+                      <h6>Total Expenses</h6>
+                      <h4>₹{{ getTotalExpenses() | number:'1.2-2' }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div class="card bg-warning text-white">
+                    <div class="card-body">
+                      <h6>Cash</h6>
+                      <h4>₹{{ getExpensesByMode('Cash') | number:'1.2-2' }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div class="card bg-info text-white">
+                    <div class="card-body">
+                      <h6>UPI</h6>
+                      <h4>₹{{ getExpensesByMode('UPI') | number:'1.2-2' }}</h4>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table cTable striped hover>
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Category</th>
+                      <th>Amount</th>
+                      <th>Payment Mode</th>
+                      <th>Remarks</th>
+                      <th>Created By</th>
+                      <th>Linked</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @if (isLoading()) {
+                      <tr>
+                        <td colspan="7" class="text-center">Loading...</td>
+                      </tr>
+                    } @else if (expenseReport().length === 0) {
+                      <tr>
+                        <td colspan="7" class="text-center">No expenses found for this date</td>
+                      </tr>
+                    } @else {
+                      @for (item of expenseReport(); track item.entryId) {
+                        <tr>
+                          <td>{{ item.createdAt | date:'HH:mm:ss' }}</td>
+                          <td>{{ item.categoryName }}</td>
+                          <td><strong class="text-danger">₹{{ item.amount | number:'1.2-2' }}</strong></td>
+                          <td>{{ item.paymentMode }}</td>
+                          <td>{{ item.remarks || '-' }}</td>
+                          <td>{{ item.createdBy }}</td>
+                          <td>{{ item.linkedReference || '-' }}</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          <!-- =============================================
+               TAB 6: Daily Cylinder Stock Report
+               ============================================= -->
+          @if (activeTab() === 5) {
+            <div class="mt-3" role="tabpanel">
+              <h5>Cylinder Stock Status - {{ reportDate() }}</h5>
+              
+              <div class="row mb-3">
+                <div class="col-md-2">
+                  <div class="card bg-primary text-white">
+                    <div class="card-body">
+                      <h6>Total Stock</h6>
+                      <h4>{{ getTotalCylinderStock() }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div class="card bg-success text-white">
+                    <div class="card-body">
+                      <h6>Filled</h6>
+                      <h4>{{ getTotalFilledStock() }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div class="card bg-warning text-white">
+                    <div class="card-body">
+                      <h6>Empty</h6>
+                      <h4>{{ getTotalEmptyStock() }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div class="card bg-danger text-white">
+                    <div class="card-body">
+                      <h6>Damaged</h6>
+                      <h4>{{ getTotalDamagedStock() }}</h4>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table cTable striped hover>
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Category</th>
+                      <th>Filled</th>
+                      <th>Empty</th>
+                      <th>Damaged</th>
+                      <th>Total</th>
+                      <th>Daily Filled In</th>
+                      <th>Daily Filled Out</th>
+                      <th>Daily Empty In</th>
+                      <th>Daily Empty Out</th>
+                      <th>Damaged Change</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @if (isLoading()) {
+                      <tr>
+                        <td colspan="11" class="text-center">Loading...</td>
+                      </tr>
+                    } @else if (cylinderStockReport().length === 0) {
+                      <tr>
+                        <td colspan="11" class="text-center">No cylinder stock data found</td>
+                      </tr>
+                    } @else {
+                      @for (item of cylinderStockReport(); track item.productId) {
+                        <tr>
+                          <td><strong>{{ item.productName }}</strong></td>
+                          <td>{{ item.categoryName }}</td>
+                          <td class="text-success">{{ item.currentFilled }}</td>
+                          <td class="text-warning">{{ item.currentEmpty }}</td>
+                          <td class="text-danger">{{ item.currentDamaged }}</td>
+                          <td><strong>{{ item.totalStock }}</strong></td>
+                          <td class="text-success">+{{ item.dailyFilledInward }}</td>
+                          <td class="text-danger">-{{ item.dailyFilledOutward }}</td>
+                          <td class="text-success">+{{ item.dailyEmptyInward }}</td>
+                          <td class="text-danger">-{{ item.dailyEmptyOutward }}</td>
+                          <td [class]="item.dailyDamagedChange > 0 ? 'text-danger' : 'text-success'">
+                            {{ item.dailyDamagedChange > 0 ? '+' : '' }}{{ item.dailyDamagedChange }}
+                          </td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          <!-- =============================================
+               TAB 7: Daily Other Items Stock Report
+               ============================================= -->
+          @if (activeTab() === 6) {
+            <div class="mt-3" role="tabpanel">
+              <h5>Other Items Stock Status - {{ reportDate() }}</h5>
+              
+              <div class="row mb-3">
+                <div class="col-md-3">
+                  <div class="card bg-primary text-white">
+                    <div class="card-body">
+                      <h6>Total Stock</h6>
+                      <h4>{{ getTotalOtherItemsStock() }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-success text-white">
+                    <div class="card-body">
+                      <h6>Daily Inward</h6>
+                      <h4>+{{ getTotalOtherItemsInward() }}</h4>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-warning text-white">
+                    <div class="card-body">
+                      <h6>Daily Outward</h6>
+                      <h4>-{{ getTotalOtherItemsOutward() }}</h4>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table cTable striped hover>
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Category</th>
+                      <th>SubCategory</th>
+                      <th>Current Stock</th>
+                      <th>Daily Inward</th>
+                      <th>Daily Outward</th>
+                      <th>Net Change</th>
+                      <th>Last Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @if (isLoading()) {
+                      <tr>
+                        <td colspan="8" class="text-center">Loading...</td>
+                      </tr>
+                    } @else if (otherItemsStockReport().length === 0) {
+                      <tr>
+                        <td colspan="8" class="text-center">No other items stock data found</td>
+                      </tr>
+                    } @else {
+                      @for (item of otherItemsStockReport(); track item.productId) {
+                        <tr>
+                          <td><strong>{{ item.productName }}</strong></td>
+                          <td>{{ item.categoryName }}</td>
+                          <td>{{ item.subCategoryName }}</td>
+                          <td><strong>{{ item.currentStock }}</strong></td>
+                          <td class="text-success">+{{ item.dailyInward }}</td>
+                          <td class="text-danger">-{{ item.dailyOutward }}</td>
+                          <td [class]="item.netChange > 0 ? 'text-success' : item.netChange < 0 ? 'text-danger' : ''">
+                            {{ item.netChange > 0 ? '+' : '' }}{{ item.netChange }}
+                          </td>
+                          <td>{{ item.lastUpdated | date:'short' }}</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        </div>
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

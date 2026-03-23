@@ -67,6 +67,13 @@ export const navItems: AppNavData[] = [
     iconComponent: { name: 'cil-money' },
     title: false
   },
+  // Reports menu is now loaded from database via MenuService
+  // {
+  //   name: 'Reports',
+  //   url: '/reports',
+  //   iconComponent: { name: 'cil-chart' },
+  //   title: false
+  // },
   {
     title: true,
     name: 'Masters'
@@ -115,6 +122,12 @@ export const navItems: AppNavData[] = [
     name: 'Customer Credit',
     url: '/customer-credit',
     iconComponent: { name: 'cil-credit-card' },
+    title: false
+  },
+  {
+    name: 'Connections',
+    url: '/connections',
+    iconComponent: { name: 'cil-link' },
     title: false
   },
   {

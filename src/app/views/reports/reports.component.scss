@@ -1,0 +1,51 @@
+// Reports Component Styles
+.card {
+  margin-bottom: 0.5rem;
+}
+
+.card-body h6 {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.9;
+}
+
+.card-body h3, .card-body h4 {
+  margin: 0;
+  font-weight: bold;
+}
+
+.table {
+  font-size: 0.9rem;
+}
+
+.table th {
+  white-space: nowrap;
+  font-weight: 600;
+  background-color: #f8f9fa;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+.badge {
+  font-size: 0.85rem;
+  padding: 0.35em 0.65em;
+}
+
+.text-danger {
+  color: #dc3545 !important;
+}
+
+.text-success {
+  color: #28a745 !important;
+}
+
+.text-warning {
+  color: #ffc107 !important;
+}
+
+.table-responsive {
+  max-height: 600px;
+  overflow-y: auto;
+}

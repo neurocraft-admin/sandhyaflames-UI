@@ -1,0 +1,172 @@
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header>
+        <strong>Daily Delivery Report</strong>
+      </c-card-header>
+      <c-card-body>
+        <!-- Filters -->
+        <c-row class="mb-3">
+          <c-col md="2">
+            <label cLabel for="startDate">Start Date</label>
+            <input 
+              cFormControl 
+              type="date" 
+              id="startDate"
+              [(ngModel)]="startDate" 
+              (change)="onDateChange()"
+            />
+          </c-col>
+          <c-col md="2">
+            <label cLabel for="endDate">End Date</label>
+            <input 
+              cFormControl 
+              type="date" 
+              id="endDate"
+              [(ngModel)]="endDate" 
+              (change)="onDateChange()"
+            />
+          </c-col>
+          <c-col md="2">
+            <label cLabel for="statusFilter">Status</label>
+            <select 
+              cSelect 
+              id="statusFilter"
+              [(ngModel)]="statusFilter"
+              (change)="onFilterChange()"
+            >
+              <option value="">All</option>
+              <option value="Open">Open</option>
+              <option value="Closed">Closed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </c-col>
+          <c-col md="2">
+            <label cLabel>&nbsp;</label>
+            <div class="d-grid">
+              <button 
+                cButton 
+                color="secondary" 
+                variant="outline"
+                (click)="clearFilters()"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </c-col>
+          <c-col md="5" class="text-end">
+            <label cLabel>&nbsp;</label>
+            <div>
+              <button 
+                cButton 
+                color="success"
+                (click)="exportToExcel()"
+                [disabled]="reportData().length === 0"
+              >
+                <svg cIcon name="cilCloudDownload" class="me-2"></svg>
+                Export to Excel
+              </button>
+            </div>
+          </c-col>
+        </c-row>
+
+        <!-- Summary Cards -->
+        <c-row class="mb-3">
+          <c-col sm="6" lg="3">
+            <div class="border-start border-start-4 border-start-info py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Total Deliveries</div>
+              <div class="fs-5 fw-semibold">{{ getTotalDeliveries() }}</div>
+            </div>
+          </c-col>
+          <c-col sm="6" lg="3">
+            <div class="border-start border-start-4 border-start-success py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Closed</div>
+              <div class="fs-5 fw-semibold">{{ getClosedDeliveries() }}</div>
+            </div>
+          </c-col>
+          <c-col sm="6" lg="3">
+            <div class="border-start border-start-4 border-start-primary py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Total Quantity</div>
+              <div class="fs-5 fw-semibold">{{ getTotalQuantity() }}</div>
+            </div>
+          </c-col>
+          <c-col sm="6" lg="3">
+            <div class="border-start border-start-4 border-start-warning py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Cash Collected</div>
+              <div class="fs-5 fw-semibold">₹{{ getTotalCash().toLocaleString() }}</div>
+            </div>
+          </c-col>
+        </c-row>
+
+        <!-- Loading Spinner -->
+        <div *ngIf="isLoading()" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+
+        <!-- Data Table -->
+        <div *ngIf="!isLoading()" class="table-responsive">
+          <table cTable [hover]="true" [striped]="true" class="border">
+            <thead>
+              <tr>
+                <th>Delivery ID</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Driver</th>
+                <th>Helper</th>
+                <th>Vehicle</th>
+                <th>Route</th>
+                <th>Products</th>
+                <th>Quantity</th>
+                <th>Cash Collected</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (reportData().length === 0) {
+                <tr>
+                  <td colspan="11" class="text-center text-muted py-4">
+                    No data available for selected date and filters
+                  </td>
+                </tr>
+              }
+              @for (item of reportData(); track item.deliveryId) {
+                <tr>
+                  <td>{{ item.deliveryId }}</td>
+                  <td>{{ item.deliveryDate | date: 'dd/MM/yyyy' }}</td>
+                  <td>
+                    <span 
+                      class="badge"
+                      [ngClass]="{
+                        'bg-success': item.status === 'Closed',
+                        'bg-warning': item.status === 'Open',
+                        'bg-danger': item.status === 'Cancelled'
+                      }"
+                    >
+                      {{ item.status }}
+                    </span>
+                  </td>
+                  <td>{{ item.driverName }}</td>
+                  <td>{{ item.helperName || '-' }}</td>
+                  <td>{{ item.vehicleNumber }}</td>
+                  <td>{{ item.routeName }}</td>
+                  <td>
+                    <small [title]="item.productsDetail">
+                      {{ item.totalProductTypes }} types
+                    </small>
+                  </td>
+                  <td>{{ item.totalQuantity }}</td>
+                  <td>₹{{ item.cashCollected.toLocaleString() }}</td>
+                  <td>
+                    <small>{{ item.remarks || '-' }}</small>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

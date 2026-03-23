@@ -1,0 +1,143 @@
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header>
+        <strong>Income/Expense Report</strong>
+      </c-card-header>
+      <c-card-body>
+        <c-row class="mb-3">
+          <c-col md="2">
+            <label cLabel for="startDate">Start Date</label>
+            <input 
+              cFormControl 
+              type="date" 
+              id="startDate"
+              [(ngModel)]="startDate" 
+              (change)="onDateChange()"
+            />
+          </c-col>
+          <c-col md="2">
+            <label cLabel for="endDate">End Date</label>
+            <input 
+              cFormControl 
+              type="date" 
+              id="endDate"
+              [(ngModel)]="endDate" 
+              (change)="onDateChange()"
+            />
+          </c-col>
+          <c-col md="3">
+            <label cLabel for="category">Category (Optional)</label>
+            <select 
+              cFormControl 
+              id="category"
+              [(ngModel)]="selectedCategory"
+              (change)="onCategoryChange()"
+            >
+              <option [value]="undefined">All Categories</option>
+              @for (cat of categories(); track cat.categoryId) {
+                <option [value]="cat.categoryId">{{ cat.categoryName }}</option>
+              }
+            </select>
+          </c-col>
+          <c-col md="5" class="text-end">
+            <label cLabel>&nbsp;</label>
+            <div>
+              <button 
+                cButton 
+                color="success"
+                (click)="exportToExcel()"
+                [disabled]="reportData().length === 0"
+              >
+                <svg cIcon name="cilCloudDownload" class="me-2"></svg>
+                Export to Excel
+              </button>
+            </div>
+          </c-col>
+        </c-row>
+
+        <c-row class="mb-3">
+          <c-col lg="6">
+            <div class="border-start border-start-4 border-start-info py-1 px-3 mb-3">
+              <div class="text-body-secondary text-truncate small">Total Income</div>
+              <div class="fs-5 fw-semibold text-success">₹{{ getTotalIncome().toLocaleString() }}</div>
+            </div>
+            <div class="border-start border-start-4 border-start-danger py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Total Expenses</div>
+              <div class="fs-5 fw-semibold text-danger">₹{{ getTotalExpenses().toLocaleString() }}</div>
+            </div>
+          </c-col>
+          <c-col lg="6">
+            <c-card class="mb-0">
+              <c-card-body class="p-2">
+                <div class="small mb-2"><strong>Breakdown Summary:</strong></div>
+                @for (cat of getCategoryArray(); track cat.category) {
+                  <div class="d-flex justify-content-between">
+                    <span class="text-muted small">{{ cat.category }}:</span>
+                    <span class="fw-semibold small" [class.text-success]="cat.amount > 0" [class.text-danger]="cat.amount < 0">₹{{ Math.abs(cat.amount).toLocaleString() }}</span>
+                  </div>
+                }
+              </c-card-body>
+            </c-card>
+          </c-col>
+        </c-row>
+
+        <div *ngIf="isLoading()" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+
+        <div *ngIf="!isLoading()" class="table-responsive">
+          <table cTable [hover]="true" [striped]="true" class="border">
+            <thead>
+              <tr>
+                <th>Entry ID</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th>Payment Mode</th>
+                <th>Remarks</th>
+                <th>Created By</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (reportData().length === 0) {
+                <tr>
+                  <td colspan="8" class="text-center text-muted py-4">
+                    No data available for selected date range
+                  </td>
+                </tr>
+              }
+              @for (item of reportData(); track item.entryId) {
+                <tr>
+                  <td>{{ item.entryId }}</td>
+                  <td>{{ item.entryDate | date: 'dd/MM/yyyy' }}</td>
+                  <td>
+                    <span class="badge" 
+                          [class.bg-success]="item.type === 'Income'"
+                          [class.bg-danger]="item.type === 'Expense'">
+                      {{ item.type }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge bg-secondary">{{ item.categoryName }}</span>
+                  </td>
+                  <td class="fw-semibold" 
+                      [class.text-success]="item.type === 'Income'"
+                      [class.text-danger]="item.type === 'Expense'">
+                    ₹{{ item.amount.toLocaleString() }}
+                  </td>
+                  <td>{{ item.paymentMode }}</td>
+                  <td><small>{{ item.remarks || '-' }}</small></td>
+                  <td>{{ item.createdBy }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

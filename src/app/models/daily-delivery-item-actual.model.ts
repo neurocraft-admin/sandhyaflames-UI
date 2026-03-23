@@ -1,3 +1,11 @@
+export interface PaymentSplitBreakdown {
+  cash: number;
+  upi: number;
+  card: number;
+  bank: number;
+  credit: number;
+}
+
 export interface DailyDeliveryItemActual {
   actualId?: number;
   deliveryId: number;
@@ -15,6 +23,7 @@ export interface DailyDeliveryItemActual {
   updatedAt?: Date;
   unitPrice: number;
   totalAmount: number;
+  paymentBreakdown?: PaymentSplitBreakdown;
 }
 
 export interface UpdateItemActualsRequest {
@@ -23,12 +32,14 @@ export interface UpdateItemActualsRequest {
 
 export interface ItemActualInput {
   productId: number;
-  delivered: number;
-  pending: number;
+  deliveredQuantity: number;
+  pendingQuantity: number;
   emptyReturned: number;
   damagedReturned: number;
   cashCollected: number;
+  itemStatus?: string;
   remarks?: string;
+  paymentSplit?: PaymentSplitBreakdown;
 }
 
 export interface DeliveryWithItems {
