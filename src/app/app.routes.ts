@@ -37,6 +37,21 @@ export const routes: Routes = [
   { path: 'CommercialDeliveries',loadChildren: () => import('./views/commercial-delivery-list/routes').then(m => m.routes)},
   { path: 'DeliveryMapping',loadChildren: () => import('./views/delivery-mapping/routes').then(m => m.routes)},
   { path: 'IncomeExpenseForm',loadChildren: () => import('./views/income-expense/routes').then(m => m.routes)},
+  // Reports Module - 8 separate report pages
+  { 
+    path: 'reports', 
+    children: [
+      { path: '', redirectTo: 'daily-delivery', pathMatch: 'full' },
+      { path: 'daily-delivery', loadComponent: () => import('./views/reports/daily-delivery/daily-delivery.component').then(m => m.DailyDeliveryComponent) },
+      { path: 'cash-collection', loadComponent: () => import('./views/reports/cash-collection/cash-collection.component').then(m => m.CashCollectionComponent) },
+      { path: 'driver-delivery', loadComponent: () => import('./views/reports/driver-delivery/driver-delivery.component').then(m => m.DriverDeliveryComponent) },
+      { path: 'helper-delivery', loadComponent: () => import('./views/reports/helper-delivery/helper-delivery.component').then(m => m.HelperDeliveryComponent) },
+      { path: 'expense', loadComponent: () => import('./views/reports/expense/expense.component').then(m => m.ExpenseComponent) },
+      { path: 'cylinder-stock', loadComponent: () => import('./views/reports/cylinder-stock/cylinder-stock.component').then(m => m.CylinderStockComponent) },
+      { path: 'other-items-stock', loadComponent: () => import('./views/reports/other-items-stock/other-items-stock.component').then(m => m.OtherItemsStockComponent) },
+      { path: 'performance', loadComponent: () => import('./views/reports/performance/performance.component').then(m => m.PerformanceComponent) }
+    ]
+  },
   { path: 'role-permissions', loadComponent: () => import('./views/role-permissions/role-permissions.component').then(m => m.RolePermissionsComponent) },
 
 ]

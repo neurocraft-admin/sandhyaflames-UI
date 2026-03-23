@@ -1,0 +1,100 @@
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header>
+        <strong>Other Items Stock Report</strong>
+      </c-card-header>
+      <c-card-body>
+        <c-row class="mb-3">
+          <c-col md="3">
+            <label cLabel for="reportDate">Report Date</label>
+            <input 
+              cFormControl 
+              type="date" 
+              id="reportDate"
+              [(ngModel)]="reportDate" 
+              (change)="onDateChange()"
+            />
+          </c-col>
+          <c-col md="9" class="text-end">
+            <label cLabel>&nbsp;</label>
+            <div>
+              <button 
+                cButton 
+                color="success"
+                (click)="exportToExcel()"
+                [disabled]="reportData().length === 0"
+              >
+                <svg cIcon name="cilCloudDownload" class="me-2"></svg>
+                Export to Excel
+              </button>
+            </div>
+          </c-col>
+        </c-row>
+
+        <c-row class="mb-3">
+          <c-col sm="6" lg="6">
+            <div class="border-start border-start-4 border-start-primary py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Total Sold</div>
+              <div class="fs-5 fw-semibold">{{ getTotalSold() }} items</div>
+            </div>
+          </c-col>
+          <c-col sm="6" lg="6">
+            <div class="border-start border-start-4 border-start-success py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Total Closing Stock</div>
+              <div class="fs-5 fw-semibold">{{ getTotalClosingStock() }} items</div>
+            </div>
+          </c-col>
+        </c-row>
+
+        <div *ngIf="isLoading()" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+
+        <div *ngIf="!isLoading()" class="table-responsive">
+          <table cTable [hover]="true" [striped]="true" class="border">
+            <thead>
+              <tr>
+                <th>Product Name</th>
+                <th>Category</th>
+                <th>Current Stock</th>
+                <th>Daily Inward</th>
+                <th>Daily Outward</th>
+                <th>Net Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (reportData().length === 0) {
+                <tr>
+                  <td colspan="6" class="text-center text-muted py-4">
+                    No stock data available for selected date
+                  </td>
+                </tr>
+              }
+              @for (item of reportData(); track item.productId) {
+                <tr>
+                  <td class="fw-semibold">{{ item.productName }}</td>
+                  <td><small>{{ item.categoryName }}</small></td>
+                  <td class="fw-semibold">{{ item.currentStock }}</td>
+                  <td class="text-success">{{ item.dailyInward }}</td>
+                  <td class="text-primary">{{ item.dailyOutward }}</td>
+                  <td 
+                    [ngClass]="{
+                      'text-success': item.netChange > 0,
+                      'text-danger': item.netChange < 0,
+                      'text-muted': item.netChange === 0
+                    }"
+                  >
+                    {{ item.netChange > 0 ? '+' : '' }}{{ item.netChange }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

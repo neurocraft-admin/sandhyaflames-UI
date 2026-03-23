@@ -1,0 +1,126 @@
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header>
+        <strong>Cash Collection Report</strong>
+      </c-card-header>
+      <c-card-body>
+        <!-- Date Filter -->
+        <c-row class="mb-3">
+          <c-col md="2">
+            <label cLabel for="startDate">Start Date</label>
+            <input 
+              cFormControl 
+              type="date" 
+              id="startDate"
+              [(ngModel)]="startDate" 
+              (change)="onDateChange()"
+            />
+          </c-col>
+          <c-col md="2">
+            <label cLabel for="endDate">End Date</label>
+            <input 
+              cFormControl 
+              type="date" 
+              id="endDate"
+              [(ngModel)]="endDate" 
+              (change)="onDateChange()"
+            />
+          </c-col>
+          <c-col md="9" class="text-end">
+            <label cLabel>&nbsp;</label>
+            <div>
+              <button 
+                cButton 
+                color="success"
+                (click)="exportToExcel()"
+                [disabled]="reportData().length === 0"
+              >
+                <svg cIcon name="cilCloudDownload" class="me-2"></svg>
+                Export to Excel
+              </button>
+            </div>
+          </c-col>
+        </c-row>
+
+        <!-- Summary Cards -->
+        <c-row class="mb-3">
+          <c-col sm="6" lg="4">
+            <div class="border-start border-start-4 border-start-primary py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Total Amount</div>
+              <div class="fs-5 fw-semibold">₹{{ getTotalAmount().toLocaleString() }}</div>
+            </div>
+          </c-col>
+          <c-col sm="6" lg="4">
+            <div class="border-start border-start-4 border-start-success py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Cash Payments</div>
+              <div class="fs-5 fw-semibold">₹{{ getCashPaymentTotal().toLocaleString() }}</div>
+            </div>
+          </c-col>
+          <c-col sm="6" lg="4">
+            <div class="border-start border-start-4 border-start-info py-1 px-3">
+              <div class="text-body-secondary text-truncate small">Online Payments</div>
+              <div class="fs-5 fw-semibold">₹{{ getOnlinePaymentTotal().toLocaleString() }}</div>
+            </div>
+          </c-col>
+        </c-row>
+
+        <!-- Loading Spinner -->
+        <div *ngIf="isLoading()" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+
+        <!-- Data Table -->
+        <div *ngIf="!isLoading()" class="table-responsive">
+          <table cTable [hover]="true" [striped]="true" class="border">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Reference</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th>Payment Mode</th>
+                <th>Collection Time</th>
+                <th>Collected By</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (reportData().length === 0) {
+                <tr>
+                  <td colspan="7" class="text-center text-muted py-4">
+                    No data available for selected date
+                  </td>
+                </tr>
+              }
+              @for (item of reportData(); track $index) {
+                <tr>
+                  <td>{{ item.source }}</td>
+                  <td>{{ item.reference }}</td>
+                  <td>
+                    <span class="badge bg-secondary">{{ item.category }}</span>
+                  </td>
+                  <td class="fw-semibold">₹{{ item.amount.toLocaleString() }}</td>
+                  <td>
+                    <span 
+                      class="badge"
+                      [ngClass]="{
+                        'bg-success': item.paymentMode === 'Cash',
+                        'bg-info': item.paymentMode !== 'Cash'
+                      }"
+                    >
+                      {{ item.paymentMode }}
+                    </span>
+                  </td>
+                  <td>{{ item.collectionTime }}</td>
+                  <td>{{ item.collectedBy }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

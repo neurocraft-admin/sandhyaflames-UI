@@ -226,14 +226,14 @@
               </span>
             </td>
             <td>
-              <!-- ✅ NEW: Edit button (only for Open deliveries) -->
-              <button 
+              <!-- ✅ DISABLED: Edit button (only for Open deliveries) -->
+              <!-- <button 
                 *ngIf="permissions.canUpdate && d.Status === 'Open'" 
                 class="btn btn-primary btn-sm me-1" 
                 (click)="loadDeliveryForEdit(d.DeliveryId)"
                 title="Edit delivery details (driver, vehicle, times)">
                 Edit
-              </button>
+              </button> -->
               
               <!-- Cancel button - Frees resources and restores stock -->
               <button 
@@ -244,10 +244,12 @@
                 Cancel
               </button>
 
-              <button *ngIf="permissions.canUpdate" class="btn btn-info btn-sm me-1" (click)="recompute(d.DeliveryId)"
+              <!-- ✅ DISABLED: Recompute button -->
+              <!-- <button *ngIf="permissions.canUpdate" class="btn btn-info btn-sm me-1" (click)="recompute(d.DeliveryId)"
                 title="Recalculate planned items from delivery items (use after editing items or to populate initial metrics)">
                 Recompute
-              </button>
+              </button> -->
+              
               <button *ngIf="permissions.canUpdate" class="btn btn-warning btn-sm" [routerLink]="['/DailyDeliveryUpdate', d.DeliveryId]">
                 Update
               </button>
