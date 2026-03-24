@@ -30,6 +30,23 @@ export interface DailyCashCollectionReport {
   paymentMode: string;
   collectionTime: string;
   collectedBy: string;
+  deliveryId?: number;
+  productId?: number;
+}
+
+// 2️⃣-A Payment Mode Summary (for charts)
+export interface PaymentModeSummary {
+  paymentMode: string;
+  totalAmount: number;
+  transactionCount: number;
+}
+
+// 2️⃣-B Daily Collection Trend (for charts)
+export interface DailyCollectionTrend {
+  collectionDate: string;
+  deliveryAmount: number;
+  incomeAmount: number;
+  totalAmount: number;
 }
 
 // 3️⃣ Daily Driver Delivery Report
@@ -112,4 +129,29 @@ export interface PerformanceReport {
   avgItemsPerDelivery: number;
   completionRate: number;
   dailyBreakdown?: string;
+}
+
+// 9️⃣ Income/Expense Payment Mode Summary (for charts)
+export interface IncomeExpensePaymentSummary {
+  paymentMode: string;
+  incomeAmount: number;
+  expenseAmount: number;
+  totalAmount: number;
+  transactionCount: number;
+}
+
+// 🔟 Income/Expense Daily Trend (for charts)
+export interface IncomeExpenseDailyTrend {
+  entryDate: string;
+  incomeAmount: number;
+  expenseAmount: number;
+  netAmount: number;
+}
+
+// 1️⃣1️⃣ Income/Expense Category Summary (for charts)
+export interface IncomeExpenseCategorySummary {
+  categoryName: string;
+  type: string;  // "Income" or "Expense"
+  totalAmount: number;
+  transactionCount: number;
 }
