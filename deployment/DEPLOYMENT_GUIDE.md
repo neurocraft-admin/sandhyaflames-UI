@@ -8,8 +8,8 @@
 ### 1. VM Setup
 - **OS:** Ubuntu 22.04 (ubuntu-2204-jammy-v20251002)
 - **Network Tags:** default, http-server, https-server, sandhya-prod-vm
-- **Public IP:** 34.14.178.225
-- **Firewall:** Allow ports 80, 443, 5000 (API), 1433 (SQL Server)
+- **Public IP:** 34.100.216.87
+- **Firewall:** Allow ports 80, 443, 5027 (API), 1433 (SQL Server)
 
 ### 2. Software Requirements (Already Installed)
 - ✅ NGINX (web server)
@@ -17,18 +17,76 @@
 - ✅ SQL Server Express (localhost,1433)
 - ✅ Git
 
-### 3. Current Production Setup
+### 3. Git Configuration (Required Before First Deployment)
+
+**⚠️ IMPORTANT:** Configure Git safe directories to avoid ownership errors when pulling code.
+
+```bash
+# SSH into production VM
+ssh nnidh@34.100.216.87
+
+# Add frontend directory to safe directories
+git config --global --add safe.directory /var/www/sandhyaflames-frontend
+
+# Add backend directory to safe directories
+git config --global --add safe.directory /opt/sandhyaflames-api
+
+# Verify configuration
+git config --global --get-all safe.directory
+```
+
+**Why is this needed?**  
+The repositories are owned by `root` or `www-data`, but you're logged in as `nnidh`. Git security requires explicit permission to work with repositories owned by other users.
+
+**Alternative:** Use `sudo git` commands if you prefer not to configure safe directories.
+
+### 4. Current Production Setup
 - **Frontend:** /var/www/sandhyaflames-frontend
 - **Backend:** /opt/sandhyaflames-api
 - **Service:** sandhyaflames-api.service
 - **Database:** localhost,1433 (sandhyaflames)
 - **Deployment Scripts:** ~/deployment-scripts (deploy.sh, rollback.sh)
 - **VM User:** nnidh
-- **VM IP:** 34.14.178.225
+- **VM IP:** 34.100.216.87
 
 ---
 
 ## 🚀 INITIAL SETUP (One-time)
+
+### Step 0: Upload Deployment Scripts to VM (First Time)
+
+**⚠️ IMPORTANT:** The deployment scripts must be uploaded to the VM before first use.
+
+**Option A: Download from GitHub (Recommended)**
+```bash
+# SSH into production VM
+ssh nnidh@34.100.216.87
+
+# Create deployment-scripts directory
+mkdir -p ~/deployment-scripts
+cd ~/deployment-scripts
+
+# Download deployment scripts from GitHub
+wget https://raw.githubusercontent.com/neurocraft-admin/sandhyaflames-UI/main/deployment/deploy.sh -O deploy.sh
+wget https://raw.githubusercontent.com/neurocraft-admin/sandhyaflames-UI/main/deployment/rollback.sh -O rollback.sh
+
+# Make them executable
+chmod +x deploy.sh rollback.sh
+
+# Verify scripts are present
+ls -la ~/deployment-scripts/
+```
+
+**Option B: Upload using SCP from Local Machine**
+```powershell
+# From your local machine (PowerShell)
+cd "d:\Workspace\Projects\Sandhya Flames\gas-agency-ui"
+scp deployment/deploy.sh nnidh@34.100.216.87:~/deployment-scripts/
+scp deployment/rollback.sh nnidh@34.100.216.87:~/deployment-scripts/
+
+# Make them executable via SSH
+ssh nnidh@34.100.216.87 "chmod +x ~/deployment-scripts/*.sh"
+```
 
 ### Step 1: Create Deployment User
 ```bash
@@ -94,21 +152,21 @@ dotnet --version  # Verify 9.0.x
 3. **Update on the VM** (choose ONE method):
 
    **Option A: Using WinSCP**
-   - Connect to VM: `34.14.178.225` (user: `nnidh`)
+   - Connect to VM: `34.100.216.87` (user: `nnidh`)
    - Upload `deploy.sh` and `rollback.sh` to `~/deployment-scripts/`
    - Set executable permissions via SSH: `chmod +x ~/deployment-scripts/*.sh`
 
    **Option B: Using SCP from local machine**
-   ```bash
-   scp deployment/deploy.sh nnidh@34.14.178.225:~/deployment-scripts/
-   scp deployment/rollback.sh nnidh@34.14.178.225:~/deployment-scripts/
-   ssh nnidh@34.14.178.225 "chmod +x ~/deployment-scripts/*.sh"
+   ```powershell
+   scp deployment/deploy.sh nnidh@34.100.216.87:~/deployment-scripts/
+   scp deployment/rollback.sh nnidh@34.100.216.87:~/deployment-scripts/
+   ssh nnidh@34.100.216.87 "chmod +x ~/deployment-scripts/*.sh"
    ```
 
-   **Option C: Download directly on VM from GitHub**
+   **Option C: Download directly on VM from GitHub (Recommended)**
    ```bash
    # SSH into the VM
-   ssh nnidh@34.14.178.225
+   ssh nnidh@34.100.216.87
 
    # Navigate to deployment scripts directory
    cd ~/deployment-scripts
@@ -160,10 +218,13 @@ Edit `deploy.sh` and update:
 
 3. **Run deployment:**
 ```bash
-# IMPORTANT: First update the deployment scripts (see above section)
+# Navigate to deployment scripts directory
 cd ~/deployment-scripts
 
-# Then deploy both frontend and backend
+# Verify scripts exist
+ls -la
+
+# Deploy both frontend and backend
 sudo ./deploy.sh all
 
 # Or deploy only frontend
@@ -172,6 +233,8 @@ sudo ./deploy.sh frontend
 # Or deploy only backend
 sudo ./deploy.sh backend
 ```
+
+**If scripts are missing:** Follow Step 0 in INITIAL SETUP section to download them first.
 
 ### Method 2: Manual Deployment
 
@@ -463,8 +526,8 @@ cat /opt/sandhya-api/publish/appsettings.Production.json
 
 ### Before Deployment:
 - [ ] **Update deployment scripts from GitHub** (see "BEFORE EACH DEPLOYMENT" section)
-- [ ] Verify scripts are latest version: `head -20 ~/deployment-scripts/deploy.sh | grep TimeoutStartSec`
-- [ ] SSH into VM: `ssh nnidh@34.14.178.225`
+- [ ] Verify scripts exist: `ls -la ~/deployment-scripts/`
+- [ ] SSH into VM: `ssh nnidh@34.100.216.87`
 - [ ] Navigate to: `cd ~/deployment-scripts`
 
 ### During Deployment:
