@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, signal, ViewChild, ElementRef, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -53,7 +53,8 @@ export class PerformanceComponent implements OnInit, AfterViewInit {
 
   constructor(
     private reportsService: ReportsService,
-    private excelService: ExcelExportService
+    private excelService: ExcelExportService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -75,7 +76,11 @@ export class PerformanceComponent implements OnInit, AfterViewInit {
       next: (data: PerformanceReport[]) => {
         this.reportData.set(data);
         this.isLoading.set(false);
-        this.updateCharts();
+        
+        // Wait for Angular to render the canvas elements before creating charts
+        setTimeout(() => {
+          this.updateCharts();
+        }, 100);
       },
       error: (error: any) => {
         console.error('Error loading performance report:', error);
@@ -117,6 +122,12 @@ export class PerformanceComponent implements OnInit, AfterViewInit {
       `Performance_Report_${this.startDate()}_to_${this.endDate()}`,
       'Performance'
     );
+    
+    // Check if canvas elements are available
+    if (!this.deliveryChartRef || !this.itemsChartRef) {
+      console.warn('Chart canvas elements not yet available');
+      return;
+    }
   }
 
   private updateCharts(): void {

@@ -10,7 +10,12 @@ import {
   DailyExpenseReport,
   DailyCylinderStockReport,
   DailyOtherItemsStockReport,
-  PerformanceReport
+  PerformanceReport,
+  PaymentModeSummary,
+  DailyCollectionTrend,
+  IncomeExpensePaymentSummary,
+  IncomeExpenseDailyTrend,
+  IncomeExpenseCategorySummary
 } from '../models/reports.model';
 
 @Injectable({
@@ -120,5 +125,57 @@ export class ReportsService {
     if (personId) params = params.set('personId', personId.toString());
 
     return this.http.get<PerformanceReport[]>(`${this.apiUrl}/performance`, { params });
+  }
+
+  // =============================================
+  // 9️⃣ Payment Mode Summary (for charts)
+  // =============================================
+  getPaymentModeSummary(startDate: string, endDate: string): Observable<PaymentModeSummary[]> {
+    const params = new HttpParams()
+      .set('startDate', startDate)
+      .set('endDate', endDate);
+    return this.http.get<PaymentModeSummary[]>(`${this.apiUrl}/payment-mode-summary`, { params });
+  }
+
+  // =============================================
+  // 🔟 Daily Collection Trend (for charts)
+  // =============================================
+  getDailyCollectionTrend(startDate: string, endDate: string): Observable<DailyCollectionTrend[]> {
+    const params = new HttpParams()
+      .set('startDate', startDate)
+      .set('endDate', endDate);
+    return this.http.get<DailyCollectionTrend[]>(`${this.apiUrl}/daily-collection-trend`, { params });
+  }
+
+  // =============================================
+  // 1️⃣1️⃣ Income/Expense Payment Mode Summary (for charts)
+  // =============================================
+  getIncomeExpensePaymentSummary(startDate: string, endDate: string, categoryId?: number): Observable<IncomeExpensePaymentSummary[]> {
+    let params = new HttpParams()
+      .set('startDate', startDate)
+      .set('endDate', endDate);
+    if (categoryId) params = params.set('categoryId', categoryId.toString());
+    return this.http.get<IncomeExpensePaymentSummary[]>(`${this.apiUrl}/income-expense-payment-summary`, { params });
+  }
+
+  // =============================================
+  // 1️⃣2️⃣ Income/Expense Daily Trend (for charts)
+  // =============================================
+  getIncomeExpenseDailyTrend(startDate: string, endDate: string, categoryId?: number): Observable<IncomeExpenseDailyTrend[]> {
+    let params = new HttpParams()
+      .set('startDate', startDate)
+      .set('endDate', endDate);
+    if (categoryId) params = params.set('categoryId', categoryId.toString());
+    return this.http.get<IncomeExpenseDailyTrend[]>(`${this.apiUrl}/income-expense-daily-trend`, { params });
+  }
+
+  // =============================================
+  // 1️⃣3️⃣ Income/Expense Category Summary (for charts)
+  // =============================================
+  getIncomeExpenseCategorySummary(startDate: string, endDate: string): Observable<IncomeExpenseCategorySummary[]> {
+    const params = new HttpParams()
+      .set('startDate', startDate)
+      .set('endDate', endDate);
+    return this.http.get<IncomeExpenseCategorySummary[]>(`${this.apiUrl}/income-expense-category-summary`, { params });
   }
 }

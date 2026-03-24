@@ -65,6 +65,37 @@
           </c-col>
         </c-row>
 
+        <!-- Charts Section -->
+        <c-row class="mb-3" *ngIf="!isLoading() && reportData().length > 0">
+          <!-- Payment Mode Distribution Chart -->
+          <c-col md="6">
+            <c-card class="h-100">
+              <c-card-header>
+                <strong>Payment Mode Distribution</strong>
+              </c-card-header>
+              <c-card-body>
+                <div style="height: 300px; position: relative;">
+                  <canvas #paymentModeChart></canvas>
+                </div>
+              </c-card-body>
+            </c-card>
+          </c-col>
+
+          <!-- Daily Collection Trend Chart -->
+          <c-col md="6">
+            <c-card class="h-100">
+              <c-card-header>
+                <strong>Daily Collection Trend</strong>
+              </c-card-header>
+              <c-card-body>
+                <div style="height: 300px; position: relative;">
+                  <canvas #trendChart></canvas>
+                </div>
+              </c-card-body>
+            </c-card>
+          </c-col>
+        </c-row>
+
         <!-- Loading Spinner -->
         <div *ngIf="isLoading()" class="text-center py-4">
           <div class="spinner-border text-primary" role="status">
