@@ -15,7 +15,7 @@ set -e  # Exit on any error
 
 # Git Repositories
 FRONTEND_REPO="https://github.com/neurocraft-admin/sandhyaflames-UI.git"
-BACKEND_REPO="https://github.com/neurocraft-admin/Ssandhyflames-WebAPI.git"
+BACKEND_REPO="https://github.com/neurocraft-admin/Ssandhyaflames-WebAPI.git"
 BRANCH="main"  # Production branch
 
 # Deployment Paths (Production VM)
@@ -32,7 +32,7 @@ API_SERVICE="sandhyaflames-api.service"
 WEB_SERVER="nginx"
 
 # VM Configuration
-PUBLIC_IP="34.14.178.225"
+PUBLIC_IP="34.100.216.87"
 DB_HOST="localhost,1433"
 API_PORT="5027"  # Backend API port
 SSL_CERT_PATH="/home/nnidh/ssl/sandhyaflames.crt"
