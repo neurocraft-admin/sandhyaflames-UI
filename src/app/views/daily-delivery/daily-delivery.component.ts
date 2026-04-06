@@ -413,6 +413,23 @@ onProductChange(itemGroup: FormGroup, product?: any) {
       next: () => {
         this.toast.success('Delivery canceled. Resources and stock have been freed.');
         this.loadDeliveries();
+        
+        // ✅ Reload available drivers and vehicles since resources are now freed
+        this.svc.getAvailableDrivers().subscribe({
+          next: d => {
+            this.drivers = d;
+            console.log('Reloaded available drivers after deletion:', d.length);
+          },
+          error: e => console.error('Driver reload error after deletion', e)
+        });
+        
+        this.svc.getAvailableVehicles().subscribe({
+          next: v => {
+            this.vehicles = v;
+            console.log('Reloaded available vehicles after deletion:', v.length);
+          },
+          error: e => console.error('Vehicle reload error after deletion', e)
+        });
       },
       error: (err) => {
         let message = 'Failed to cancel delivery';

@@ -185,14 +185,17 @@
     <div>
       <strong>Recent Income / Expense Entries</strong>
     </div>
-    <div class="d-flex gap-2">
-      <select class="form-select form-select-sm" [(ngModel)]="filterType" (change)="fetchList()">
+    <div class="d-flex gap-2 align-items-center">
+      <select class="form-select form-select-sm" [(ngModel)]="filterType">
         <option value="">All Types</option>
         <option value="Income">Income</option>
         <option value="Expense">Expense</option>
       </select>
-      <input type="date" class="form-control form-control-sm" [(ngModel)]="filterFrom" (change)="fetchList()">
-      <input type="date" class="form-control form-control-sm" [(ngModel)]="filterTo" (change)="fetchList()">
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filterFrom" placeholder="From Date">
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filterTo" placeholder="To Date">
+      <button type="button" class="btn btn-primary btn-sm" (click)="fetchList()">
+        <i class="bi bi-search"></i> Search
+      </button>
     </div>
   </div>
   <div class="card-body p-0">
@@ -214,7 +217,12 @@
           <td>{{ row.Type }}</td>
           <td>{{ row.CategoryName }}</td>
           <td>{{ row.Amount | number:'1.2-2' }}</td>
-          <td>{{ row.PaymentMode }}</td>
+          <td>
+            <span *ngIf="!row.HasSplits || row.SplitCount <= 1">{{ row.PaymentMode }}</span>
+            <span *ngIf="row.HasSplits && row.SplitCount > 1" class="badge bg-info" title="Multiple payment modes used">
+              <i class="bi bi-cash-stack"></i> Split Payment ({{ row.SplitCount }} modes)
+            </span>
+          </td>
           <td>{{ row.Remarks }}</td>
           <td>
             <button class="btn btn-sm btn-danger" (click)="deleteEntry(row.EntryId)">

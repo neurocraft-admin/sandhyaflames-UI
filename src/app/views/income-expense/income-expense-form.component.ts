@@ -35,7 +35,19 @@ export class IncomeExpenseFormComponent implements OnInit {
     });
 
     this.watchTypeChanges();
-    this.fetchList(); // Load recent entries on page load
+    
+    // Set default date range to last 5 days
+    this.setDefaultDateRange();
+    this.fetchList(); // Load entries for last 5 days
+  }
+
+  private setDefaultDateRange(): void {
+    const today = new Date();
+    const fiveDaysAgo = new Date();
+    fiveDaysAgo.setDate(today.getDate() - 5);
+    
+    this.filterFrom = fiveDaysAgo.toISOString().substring(0, 10);
+    this.filterTo = today.toISOString().substring(0, 10);
   }
   incomeExpenseList: any[] = [];
 filterType = '';
@@ -43,7 +55,12 @@ filterFrom = '';
 filterTo = '';
 
 fetchList() {
-  this.svc.fetchList(this.filterType, this.filterFrom, this.filterTo)
+  // Only pass non-empty values to avoid date parsing issues
+  const type = this.filterType || undefined;
+  const from = this.filterFrom || undefined;
+  const to = this.filterTo || undefined;
+  
+  this.svc.fetchList(type, from, to)
     .subscribe({
       next: (res) => this.incomeExpenseList = res,
       error: (err) => this.toast.error(err?.error?.title || 'Failed to load')
