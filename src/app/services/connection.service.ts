@@ -17,11 +17,22 @@ export interface ConnectionTransaction {
   depositAmount: number;
   serviceChargeAmount: number;
   totalAmount: number;
+  collectedAmount: number;
+  creditAmount: number;
   paymentMode: string;
   remarks?: string;
   status: string;
   isActive: boolean;
   createdAt: string;
+  paymentSplit?: PaymentSplitBreakdown;
+}
+
+export interface PaymentSplitBreakdown {
+  cash: number;
+  upi: number;
+  card: number;
+  bank: number;
+  credit: number;
 }
 
 export interface SaveNewConnectionRequest {
@@ -34,6 +45,7 @@ export interface SaveNewConnectionRequest {
   paymentMode: string;
   remarks?: string;
   createdBy?: string;
+  paymentSplit?: PaymentSplitBreakdown;
 }
 
 export interface SaveTransferRequest {
@@ -46,6 +58,7 @@ export interface SaveTransferRequest {
   paymentMode: string;
   remarks?: string;
   createdBy?: string;
+  paymentSplit?: PaymentSplitBreakdown;
 }
 
 export interface SaveSurrenderRequest {
@@ -57,6 +70,7 @@ export interface SaveSurrenderRequest {
   serviceChargeAmount: number;
   paymentMode: string;
   remarks?: string;
+  paymentSplit?: PaymentSplitBreakdown;
   createdBy?: string;
 }
 
