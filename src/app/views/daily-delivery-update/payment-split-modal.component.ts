@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, OnDestroy, SimpleChanges, inject, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { PaymentSplitBreakdown } from '../../models/daily-delivery-item-actual.model';
@@ -17,7 +17,7 @@ export interface PaymentSplitModalData {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule]
 })
-export class PaymentSplitModalComponent implements OnInit, OnChanges {
+export class PaymentSplitModalComponent implements OnInit, OnChanges, OnDestroy {
   private fb = inject(FormBuilder);
 
   @Input() data!: PaymentSplitModalData;
@@ -28,15 +28,55 @@ export class PaymentSplitModalComponent implements OnInit, OnChanges {
   splitForm!: FormGroup;
   validationError: string = '';
 
+  // ✅ FIX: Add ESC key handler for better UX
+  @HostListener('document:keydown.escape', [])
+  handleEscKey(): void {
+    if (this.show) {
+      this.onClose();
+    }
+  }
+
   ngOnInit(): void {
     this.initForm();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    // Reinitialize form whenever data input changes (switching between rows)
+    // ✅ FIX: Only reinit on meaningful data changes, not every cycle
     if (changes['data'] && !changes['data'].firstChange && this.splitForm) {
-      this.initForm();
+      const prevData = changes['data'].previousValue;
+      const currData = changes['data'].currentValue;
+      
+      // Only reinit if actual values changed (not just object reference)
+      if (prevData && currData && 
+          (prevData.totalAmount !== currData.totalAmount ||
+           prevData.productName !== currData.productName)) {
+        this.initForm();
+      }
     }
+    
+    // ✅ FIX: Reinit form when modal is opened
+    if (changes['show'] && changes['show'].currentValue && !changes['show'].previousValue) {
+      this.initForm();
+      this.lockBodyScroll();
+    }
+    
+    // ✅ FIX: Unlock body scroll when modal is closed
+    if (changes['show'] && !changes['show'].currentValue && changes['show'].previousValue) {
+      this.unlockBodyScroll();
+    }
+  }
+
+  ngOnDestroy(): void {
+    // ✅ FIX: Ensure body scroll is unlocked on component destroy
+    this.unlockBodyScroll();
+  }
+
+  private lockBodyScroll(): void {
+    document.body.style.overflow = 'hidden';
+  }
+
+  private unlockBodyScroll(): void {
+    document.body.style.overflow = '';
   }
 
   initForm(): void {
@@ -117,8 +157,11 @@ export class PaymentSplitModalComponent implements OnInit, OnChanges {
   }
 
   onBackdropClick(event: MouseEvent): void {
-    // Close modal when clicking on backdrop (outside modal content)
+    // ✅ FIX: Only close when clicking directly on backdrop, not on any child
+    // Use mousedown instead of click for more reliable detection
     if (event.target === event.currentTarget) {
+      event.preventDefault();
+      event.stopPropagation();
       this.onClose();
     }
   }

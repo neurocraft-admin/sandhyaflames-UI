@@ -1,7 +1,9 @@
 <!-- Modal Backdrop -->
-<div *ngIf="show" class="modal-backdrop" (click)="onBackdropClick($event)">
+<!-- ✅ FIX: Prevent backdrop click from bubbling, only close on explicit backdrop click -->
+<div *ngIf="show" class="modal-backdrop" (mousedown)="onBackdropClick($event)">
   <!-- Modal Container -->
-  <div class="modal-container" (click)="$event.stopPropagation()">
+  <!-- ✅ FIX: Stop all propagation to prevent accidental closure -->
+  <div class="modal-container" (click)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
     <!-- Modal Header -->
     <div class="modal-header">
       <h5 class="modal-title">

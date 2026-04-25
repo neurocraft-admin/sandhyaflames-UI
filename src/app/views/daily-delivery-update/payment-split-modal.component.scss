@@ -10,6 +10,9 @@
   justify-content: center;
   z-index: 1050;
   animation: fadeIn 0.2s ease-in-out;
+  // ✅ FIX: Ensure backdrop stays on top and prevents scroll
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .modal-container {
@@ -21,6 +24,9 @@
   max-height: 90vh;
   overflow-y: auto;
   animation: slideIn 0.3s ease-out;
+  // ✅ FIX: Ensure modal stays in place and doesn't move on hover
+  position: relative;
+  pointer-events: auto;
 }
 
 .modal-header {

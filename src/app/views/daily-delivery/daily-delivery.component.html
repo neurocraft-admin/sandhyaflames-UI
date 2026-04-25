@@ -190,6 +190,7 @@
             <option value="All">All</option>
             <option value="Open">Open</option>
             <option value="Closed">Closed</option>
+            <option value="Cancelled">Cancelled</option>
           </select>
         </div>
         <div class="col-md-4 d-flex align-items-end gap-2">
@@ -221,7 +222,10 @@
             <td>{{ d.HelperName || '-' }}</td> <!-- ✅ NEW -->
             <td>{{ d.RouteName || '-' }}</td> <!-- ✅ NEW -->
             <td>
-              <span class="badge" [class.bg-success]="d.Status === 'Closed'" [class.bg-warning]="d.Status === 'Open'">
+              <span class="badge" 
+                [class.bg-success]="d.Status === 'Closed'" 
+                [class.bg-warning]="d.Status === 'Open'"
+                [class.bg-secondary]="d.Status === 'Cancelled'">
                 {{ d.Status }}
               </span>
             </td>

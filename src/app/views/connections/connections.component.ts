@@ -6,9 +6,10 @@ import { ButtonDirective } from '@coreui/angular';
 import { CustomerService } from '../../services/customer.service';
 import { ProductService } from '../../services/product.service';
 import { ToastService } from '../../services/toast.service';
-import { ConnectionService, SaveNewConnectionRequest, SaveTransferRequest, SaveSurrenderRequest } from '../../services/connection.service';
+import { ConnectionService, SaveNewConnectionRequest, SaveTransferRequest, SaveSurrenderRequest, PaymentSplitBreakdown } from '../../services/connection.service';
 import { Customer } from '../../models/customer.model';
 import { Product } from '../../models/product.model';
+import { PaymentSplitModalComponent, PaymentSplitModalData } from '../daily-delivery-update/payment-split-modal.component';
 
 interface ConnectionItem {
   itemType: 'product' | 'service' | 'deposit';
@@ -22,7 +23,7 @@ interface ConnectionItem {
 @Component({
   selector: 'app-connections',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ButtonDirective],
+  imports: [CommonModule, ReactiveFormsModule, ButtonDirective, PaymentSplitModalComponent],
   templateUrl: './connections.component.html'
 })
 export class ConnectionsComponent {
@@ -41,6 +42,12 @@ export class ConnectionsComponent {
   loading = signal(false);
   isEditMode = signal(false);
   editConnectionId = signal<number | null>(null);
+
+  // Payment Split Modal
+  showPaymentSplitModal = signal(false);
+  paymentSplit: PaymentSplitBreakdown = { cash: 0, upi: 0, card: 0, bank: 0, credit: 0 };
+  // ✅ FIX: Cache modal data to prevent unnecessary reinitialization
+  private _cachedModalData: PaymentSplitModalData | null = null;
 
   connectionForm = this.fb.group({
     connectionType: ['NewConnection', Validators.required],
@@ -254,6 +261,67 @@ export class ConnectionsComponent {
     return this.connectionItems.reduce((sum, item) => sum + item.totalAmount, 0);
   }
 
+  get paymentSplitModalData(): PaymentSplitModalData {
+    // ✅ FIX: Return cached object to prevent ngOnChanges triggering on every change detection
+    if (this._cachedModalData && 
+        this._cachedModalData.totalAmount === this.totalAmount) {
+      return this._cachedModalData;
+    }
+    
+    this._cachedModalData = {
+      productName: 'Connection Payment',
+      totalAmount: this.totalAmount,
+      currentSplit: this.paymentSplit,
+      disableCredit: false
+    };
+    
+    return this._cachedModalData;
+  }
+
+  openPaymentSplitModal() {
+    // Initialize default split if not set
+    if (this.paymentSplit.cash === 0 && this.paymentSplit.upi === 0 && 
+        this.paymentSplit.card === 0 && this.paymentSplit.bank === 0 && 
+        this.paymentSplit.credit === 0) {
+      // Default to full amount in cash
+      this.paymentSplit =  { 
+        cash: this.totalAmount, 
+        upi: 0, 
+        card: 0, 
+        bank: 0, 
+        credit: 0 
+      };
+    }
+    
+    // ✅ FIX: Create new cached modal data when opening
+    this._cachedModalData = {
+      productName: 'Connection Payment',
+      totalAmount: this.totalAmount,
+      currentSplit: { ...this.paymentSplit }, // Clone to avoid reference issues
+      disableCredit: false
+    };
+    
+    this.showPaymentSplitModal.set(true);
+  }
+
+  onPaymentSplitSave(splitData: PaymentSplitBreakdown) {
+    this.paymentSplit = splitData;
+    this.showPaymentSplitModal.set(false);
+    this._cachedModalData = null; // Clear cache after save
+    this.toastSvc.success('Payment split saved');
+  }
+
+  closePaymentSplitModal() {
+    this.showPaymentSplitModal.set(false);
+    this._cachedModalData = null; // Clear cache on close
+  }
+
+  get hasPaymentSplit(): boolean {
+    return this.paymentSplit.cash > 0 || this.paymentSplit.upi > 0 || 
+           this.paymentSplit.card > 0 || this.paymentSplit.bank > 0 || 
+           this.paymentSplit.credit > 0;
+  }
+
   get connectionTypeName(): string {
     const type = this.connectionForm.get('connectionType')?.value;
     switch (type) {
@@ -331,6 +399,9 @@ export class ConnectionsComponent {
     this.connectionItems = [];
     this.addDefaultItems();
     this.isEditMode.set(false);
+    
+    // Reset payment split
+    this.paymentSplit = { cash: 0, upi: 0, card: 0, bank: 0, credit: 0 };
   }
 
   saveConnection() {
@@ -376,7 +447,8 @@ export class ConnectionsComponent {
         quantity,
         depositAmount,
         serviceChargeAmount,
-        paymentMode
+        paymentMode,
+        paymentSplit: this.hasPaymentSplit ? this.paymentSplit : undefined
       };
       
       this.connectionSvc.saveNewConnection(request).subscribe({
@@ -402,7 +474,8 @@ export class ConnectionsComponent {
         quantity,
         depositAmount,
         serviceChargeAmount,
-        paymentMode
+        paymentMode,
+        paymentSplit: this.hasPaymentSplit ? this.paymentSplit : undefined
       };
       
       this.connectionSvc.saveTransfer(request).subscribe({
@@ -428,7 +501,8 @@ export class ConnectionsComponent {
         quantity,
         depositAmount,
         serviceChargeAmount,
-        paymentMode
+        paymentMode,
+        paymentSplit: this.hasPaymentSplit ? this.paymentSplit : undefined
       };
       
       this.connectionSvc.saveSurrender(request).subscribe({

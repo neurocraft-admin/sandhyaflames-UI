@@ -206,6 +206,18 @@
               <button 
                 type="button" 
                 cButton 
+                color="info" 
+                size="lg"
+                (click)="openPaymentSplitModal()"
+                [disabled]="totalAmount === 0"
+              >
+                <i class="bi bi-credit-card me-2"></i>
+                {{ hasPaymentSplit ? 'Edit Payment Split' : 'Add Payment Split' }}
+              </button>
+              
+              <button 
+                type="button" 
+                cButton 
                 color="success" 
                 size="lg"
                 (click)="saveConnection()"
@@ -296,3 +308,11 @@
     </div>
   </div>
 </div>
+
+<!-- Payment Split Modal -->
+<app-payment-split-modal
+  [show]="showPaymentSplitModal()"
+  [data]="paymentSplitModalData"
+  (save)="onPaymentSplitSave($event)"
+  (close)="closePaymentSplitModal()"
+></app-payment-split-modal>
