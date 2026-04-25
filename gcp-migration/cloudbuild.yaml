@@ -1,0 +1,154 @@
+# Cloud Build Configuration for Flamemitra Application
+# This file automates the deployment of both frontend and backend
+#
+# SETUP:
+# 1. This cloudbuild.yaml should be in the root of your mono-repo OR
+# 2. You need separate builds for frontend and backend repos
+# 3. Configure Cloud Build triggers in GCP Console for each repo
+
+# For Frontend Repository (gas-agency-ui)
+# Place this file at the root of gas-agency-ui repo
+---
+steps:
+  # Step 1: Install frontend dependencies
+  - name: 'node:18'
+    entrypoint: npm
+    args: ['ci']
+    id: 'install-frontend-deps'
+    dir: '.'
+
+  # Step 2: Build Angular application
+  - name: 'node:18'
+    entrypoint: npm
+    args: ['run', 'build', '--', '--configuration', 'production']
+    id: 'build-frontend'
+    dir: '.'
+    waitFor: ['install-frontend-deps']
+
+  # Step 3: Deploy to Cloud Storage
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args:
+      - '-m'
+      - 'cp'
+      - '-r'
+      - 'dist/sandhyaflames-ui/browser/*'
+      - 'gs://flamemitra-frontend/'
+    id: 'deploy-to-gcs'
+    waitFor: ['build-frontend']
+
+  # Step 4: Set cache headers for index.html
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args:
+      - '-m'
+      - 'setmeta'
+      - '-h'
+      - 'Cache-Control: no-cache, no-store, must-revalidate'
+      - 'gs://flamemitra-frontend/index.html'
+    id: 'set-index-cache'
+    waitFor: ['deploy-to-gcs']
+
+  # Step 5: Set cache headers for JS files
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args:
+      - '-m'
+      - 'setmeta'
+      - '-h'
+      - 'Cache-Control: public, max-age=31536000, immutable'
+      - 'gs://flamemitra-frontend/**.js'
+    id: 'set-js-cache'
+    waitFor: ['deploy-to-gcs']
+
+  # Step 6: Set cache headers for CSS files
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args:
+      - '-m'
+      - 'setmeta'
+      - '-h'
+      - 'Cache-Control: public, max-age=31536000, immutable'
+      - 'gs://flamemitra-frontend/**.css'
+    id: 'set-css-cache'
+    waitFor: ['deploy-to-gcs']
+
+timeout: 1200s
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'
+
+---
+# For Backend Repository (WebAPI)
+# Place this file at the root of WebAPI repo
+steps:
+  # Step 1: Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/flamemitra-prod/flamemitra-api:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/flamemitra-prod/flamemitra-api:latest'
+      - '.'
+    id: 'build-docker-image'
+
+  # Step 2: Push Docker image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/flamemitra-prod/flamemitra-api:$COMMIT_SHA'
+    id: 'push-docker-image'
+    waitFor: ['build-docker-image']
+
+  # Step 3: Push latest tag
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/flamemitra-prod/flamemitra-api:latest'
+    id: 'push-latest-tag'
+    waitFor: ['build-docker-image']
+
+  # Step 4: Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'flamemitra-api'
+      - '--image'
+      - 'gcr.io/flamemitra-prod/flamemitra-api:$COMMIT_SHA'
+      - '--platform'
+      - 'managed'
+      - '--region'
+      - 'asia-south1'
+      - '--allow-unauthenticated'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '5'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--port'
+      - '8080'
+      - '--set-env-vars'
+      - 'ASPNETCORE_ENVIRONMENT=Production'
+      - '--update-env-vars'
+      - 'ConnectionStrings__DefaultConnection=${_DB_CONNECTION_STRING}'
+    id: 'deploy-to-cloud-run'
+    waitFor: ['push-docker-image']
+
+images:
+  - 'gcr.io/flamemitra-prod/flamemitra-api:$COMMIT_SHA'
+  - 'gcr.io/flamemitra-prod/flamemitra-api:latest'
+
+timeout: 1200s
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'
+
+# Substitutions for secrets and variables
+substitutions:
+  _DB_CONNECTION_STRING: ''  # Set this in Cloud Build trigger variables
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/flamemitra-prod/secrets/db-connection-string/versions/latest
+      env: 'DB_CONNECTION_STRING'
