@@ -1,6 +1,6 @@
 // environment.prod.ts
 export const environment = {
   production: true,
-  apiUrl: 'http://187.127.173.240/api',
+  apiUrl: 'https://api.flamemitra.in/api',
   emailDomain: 'sandhyaflames.in'
 };
